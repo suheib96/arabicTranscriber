@@ -15,7 +15,11 @@ def self_check(destination):
         import torch
         import yt_dlp
         import yt_dlp_ejs
-        from transformers import CohereAsrForConditionalGeneration, CohereAsrProcessor
+        from transformers import (
+            CohereAsrFeatureExtractor,
+            CohereAsrForConditionalGeneration,
+            CohereAsrProcessor,
+        )
 
         from .exports import export_transcript
         from .media import audio_segments, decode, tool
@@ -28,6 +32,11 @@ def self_check(destination):
             downloader=yt_dlp.version.__version__,
             ejs=bool(yt_dlp_ejs),
         )
+        features = CohereAsrFeatureExtractor()(
+            np.zeros(16000, dtype=np.float32), sampling_rate=16000, return_tensors="pt"
+        )
+        assert features["input_features"].shape[-1] == 128
+        report["real_cohere_preprocessing"] = True
         report["node"] = subprocess.check_output([tool("node"), "--version"], text=True).strip()
         report["ffmpeg"] = subprocess.check_output(
             [tool("ffmpeg"), "-version"], text=True
