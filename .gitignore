@@ -19,3 +19,12 @@ models/
 .cache/
 downloads/
 output/
+node_modules/
+package-lock.json
+*.p12
+*.pfx
+*.key
+*.pem
+*.safetensors
+*.pt
+*.pth
