@@ -43,3 +43,13 @@ def test_desktop_copy_and_save_dialog_use_same_timestamp_choice(tmp_path):
 
     api.window = CancelledWindow()
     assert api.export("docx", True) == {"path": None}
+
+
+def test_desktop_document_contains_local_assets_without_loopback_dependency():
+    from arabic_transcriber.app import ui_document
+
+    html = ui_document()
+    assert "<script src=" not in html
+    assert 'href="style.css"' not in html
+    assert "data:font/ttf;base64," in html
+    assert "window.desktopSmoke" in html

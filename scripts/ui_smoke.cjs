@@ -1,11 +1,15 @@
 // Software UI test against the shipped HTML; inference is not simulated here.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const path = require('path');
+const {execFileSync} = require('child_process');
 require('fs').mkdirSync('.scratch/arabic-transcriber',{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||undefined});
  const page=await browser.newPage({viewport:{width:1060,height:800},deviceScaleFactor:1});
- await page.goto('file://'+path.resolve('src/arabic_transcriber/ui/index.html'));
+ const python=process.env.PYTHON||(process.platform==='win32'?'.venv/Scripts/python.exe':'.venv/bin/python');
+ const html=execFileSync(python,['-c','from arabic_transcriber.app import ui_document; print(ui_document())'],{encoding:'utf8',maxBuffer:4*1024*1024});
+ await page.setContent(html);
+ await page.evaluate(()=>document.fonts.ready);
+ if(!await page.evaluate(()=>document.fonts.check('21px NotoArabic')))throw Error('Arabic font missing');
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-idle.png'});
  await page.evaluate(()=>{
    window.snapshot={status:'running',stage:'Transkription läuft · TESTFIXTUR',progress:0.42,segments:[

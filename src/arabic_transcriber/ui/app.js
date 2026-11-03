@@ -29,5 +29,5 @@ $('times').onchange=render;
 $('copy').onclick=async()=>{try{const result=await pywebview.api.copy_all($('outputTimes').checked);if(!result.ok)error(result.error);else feedback('Kopiert');}catch(e){error(e);}};
 $('export').onclick=async()=>{try{const r=await pywebview.api.export($('format').value,$('outputTimes').checked);if(r.error)error(r.error);else if(r.path)feedback('Gespeichert');}catch(e){error(e);}};
 window.addEventListener('pywebviewready',()=>{polling=true;setInterval(async()=>{if(!polling)return;try{const next=await pywebview.api.snapshot();if(next.revision!==snapshot.revision||next.status!==snapshot.status){snapshot=next;render();}}catch(e){polling=false;error(e);}},400);});
-window.desktopSmoke=async()=>{const state=await pywebview.api.snapshot();return {title:document.title,bridge:state.status==='idle',buttons:!!$('start')&&!!$('export'),rtl:$('transcript').dir,bodyWidth:document.body.scrollWidth,viewport:innerWidth};};
+window.desktopSmoke=async()=>{await document.fonts.ready;const state=await pywebview.api.snapshot();return {title:document.title,bridge:state.status==='idle',buttons:!!$('start')&&!!$('export'),rtl:$('transcript').dir,font:document.fonts.check('21px NotoArabic'),bodyWidth:document.body.scrollWidth,viewport:innerWidth};};
 render();
