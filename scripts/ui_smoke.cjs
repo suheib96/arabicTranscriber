@@ -6,7 +6,7 @@ require('fs').mkdirSync('.scratch/arabic-transcriber',{recursive:true});
  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||undefined});
  const page=await browser.newPage({viewport:{width:1060,height:800},deviceScaleFactor:1});
  const python=process.env.PYTHON||(process.platform==='win32'?'.venv/Scripts/python.exe':'.venv/bin/python');
- const html=execFileSync(python,['-c','from arabic_transcriber.app import ui_document; print(ui_document())'],{encoding:'utf8',maxBuffer:4*1024*1024});
+ const html=execFileSync(python,['-c','import sys; from arabic_transcriber.app import ui_document; sys.stdout.buffer.write(ui_document().encode("utf-8"))'],{encoding:'utf8',maxBuffer:4*1024*1024});
  await page.setContent(html);
  await page.evaluate(()=>document.fonts.ready);
  if(!await page.evaluate(()=>document.fonts.check('21px NotoArabic')))throw Error('Arabic font missing');
