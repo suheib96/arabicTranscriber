@@ -188,22 +188,23 @@ Die FFmpeg-Lizenz-/Quellcodeanforderungen für öffentliche Weitergabe stehen in
 
 ## GitHub Builds und Releases aktivieren
 
-Es ist **kein Remote eingerichtet und nichts veröffentlicht**. Ein eigenes leeres
-GitHub-Repository anlegen und dessen tatsächliche URL einsetzen:
+Ziel-Repository: [suheib96/arabicTranscriber](https://github.com/suheib96/arabicTranscriber).
+Der erste Build wird auf `main` geprüft; erst danach wird der Versionstag gepusht:
 
 ```sh
 git branch -M main
-git remote add origin https://github.com/OWNER/REPOSITORY.git
+git remote add origin https://github.com/suheib96/arabicTranscriber.git
 git push -u origin main
 # Nach erfolgreichem CI und lokalem Test:
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
-`.github/workflows/build.yml` testet macOS/Windows, baut native Pakete und stellt
+`.github/workflows/build.yml` testet auf macOS 15 (Apple Silicon) und Windows Server 2025 x64, baut native Pakete und stellt
 Actions-Artefakte bereit. Ein Push eines `v*`-Tags erzeugt automatisch einen
 GitHub Release mit ZIPs, Windows-Setup und einzelnen SHA256-Dateien. Das ist
-konfiguriert, aber ohne Remote noch nicht ausgeführt. Vor einer späteren Version
+eingerichtet. Aktuelle Ergebnisse stehen unter [Actions](https://github.com/suheib96/arabicTranscriber/actions),
+Downloads unter [Releases](https://github.com/suheib96/arabicTranscriber/releases). Vor einer späteren Version
 `pyproject.toml`, `__init__.py`, Bundle-/Installer-Version gemeinsam erhöhen und
 `uv lock` aktualisieren. Dependencies für yt-dlp/Node regelmäßig bewusst
 aktualisieren, testen und neu paketieren; kein unkontrolliertes Selbstupdate.
