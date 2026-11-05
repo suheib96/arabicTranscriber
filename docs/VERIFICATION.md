@@ -1,3 +1,69 @@
+# Update 2026-11-05 — version 0.1.1
+
+The exact reported two-minute YouTube hang has not been reproduced: URL, device
+and last stage were requested but not supplied during this run. The following
+independent failure modes were reproduced and corrected, without claiming that
+they establish the cause of that particular incident.
+
+- An uncooperative model load left `Job.cancel()` stuck and prevented restart.
+  Processing now runs in a spawned process. A native PyDLL call holding its GIL
+  is forcibly stopped after a brief grace period; existing segments remain.
+  Source worker check passed in 0.74 s and **frozen app worker check in 0.73 s**,
+  including IPC, successive segments and restart. No inference fixture is used
+  as a fallback in product operation.
+- Progress-only renders recreated transcript DOM and cleared selection. The
+  browser regression now verifies stable text nodes and preserved selection.
+  Slow 650 ms snapshot responses also verify that polling never overlaps.
+- UI status strings are short, with measured percentage only where available;
+  no “without percentage” / “Batch 1” explanations. Advanced options are
+  collapsed and platform-specific GPU choices are hidden where inappropriate.
+  Elapsed time keeps advancing while model progress is not measurable.
+- A generated two-minute H264/AAC video was encoded/decoded with real FFmpeg;
+  audio windows never exceed 192,000 samples (12 seconds at 16 kHz), are
+  contiguous, and preserve the complete timeline. This is not live YouTube or
+  a speech-quality/inference-speed benchmark.
+- Model processing is batch one, with at most four CPU intra-op threads and one
+  inter-op thread, direct target dtype/device loading and RAM/VRAM preflight.
+  Worker exit releases model memory after every job (disk cache retained).
+- The user's original checkpoint now exists locally (4.13 GB), and its actual
+  offline processor loaded. Available RAM during that probe was 2.71 GB versus
+  an estimated 9.87 GB CPU budget. Full weights/inference were not loaded under
+  this memory pressure. This observation is not proof of yesterday's state.
+- Thirteen pytest checks, Ruff lint/format, frontend rendering/interaction,
+  source and frozen worker checks, frozen runtime/preprocessing/export check,
+  native window/bridge/font smoke, bundle version, ZIP checksum and ad-hoc
+  signature all passed. No weights, media, signing secrets or scratch in ZIP.
+- Windows installer build helper and signing scripts parse in PowerShell.
+  Windows/macOS CI now also checks frozen spawning/cancellation. Actual Windows
+  build/installation, CUDA/MPS inference and credential-backed signing remain
+  unverified on this Mac. No remote CI/release run or public publication occurred.
+- Rotating local logs retain stages/timing/memory/error types only, with no
+  input URLs, filenames, transcripts or credentials. No throwaway debug logging
+  remains in production; controlled probes are marked in ignored scratch.
+
+Reproduce locally:
+
+```sh
+uv run pytest -q
+uv run ruff check src tests scripts
+uv run ruff format --check src tests scripts
+uv run python -m arabic_transcriber.app --worker-check --smoke-report build/worker-check.json
+uv run python scripts/build.py
+"dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --worker-check --smoke-report build/worker-check.json
+"dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --self-check --smoke-report build/package-check.json
+"dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --smoke --smoke-report build/native-smoke.json
+uv run python scripts/check_smoke.py build/native-smoke.json
+```
+
+Windows setup: on Windows 11 x64 with uv and Inno Setup 6 installed, run
+`scripts/build_windows_setup.ps1`. This helper's syntax is checked here; a
+Windows execution result is not claimed. See README for runtime prerequisites.
+
+The historical initial verification below describes 2026-11-03, before the model
+cache and the process-isolation changes above.
+
+---
+
 # Verification on 2026-11-03
 
 This is local evidence, not a claim of a published GitHub release.

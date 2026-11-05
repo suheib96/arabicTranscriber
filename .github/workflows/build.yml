@@ -78,6 +78,7 @@ jobs:
       - name: Smoke check native macOS bundle
         if: runner.os == 'macOS'
         run: |
+          "dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --worker-check --smoke-report build/worker-check.json
           "dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --self-check --smoke-report build/package-check.json
           "dist/Arabic Transcriber.app/Contents/MacOS/Arabic Transcriber" --smoke --smoke-report build/native-smoke.json
           uv run python scripts/check_smoke.py build/native-smoke.json
@@ -85,6 +86,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $process = Start-Process -FilePath 'dist/Arabic Transcriber/Arabic Transcriber.exe' -ArgumentList '--worker-check', '--smoke-report', 'build/worker-check.json' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Worker process check failed' }
           $process = Start-Process -FilePath 'dist/Arabic Transcriber/Arabic Transcriber.exe' -ArgumentList '--self-check', '--smoke-report', 'build/package-check.json' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Package check failed' }
           $process = Start-Process -FilePath 'dist/Arabic Transcriber/Arabic Transcriber.exe' -ArgumentList '--smoke', '--smoke-report', 'build/native-smoke.json' -Wait -PassThru

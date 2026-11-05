@@ -22,12 +22,32 @@ require('fs').mkdirSync('.scratch/arabic-transcriber',{recursive:true});
  if(!await page.locator('#start').isDisabled())throw Error('start enabled during job');
  if(!await page.locator('#cancel').isVisible())throw Error('cancel missing');
  if(await page.locator('.segment').count()!==3)throw Error('segments missing');
+ const stable=await page.evaluate(()=>{
+   const node=document.querySelector('.words');
+   const selection=window.getSelection(),range=document.createRange();
+   range.selectNodeContents(node);selection.removeAllRanges();selection.addRange(range);
+   const selected=selection.toString();
+   snapshot={...snapshot,progress:0.51};render();
+   return document.querySelector('.words')===node&&selection.toString()===selected;
+ });
+ if(!stable)throw Error('progress updates replaced transcript or cleared selection');
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-running.png'});
  await page.locator('#times').uncheck();
  if(await page.locator('.segment time').count())throw Error('timestamp toggle failed');
  if(await page.locator('.words').count()!==3)throw Error('toggle lost transcript');
  await page.locator('#settingsButton').click();
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-settings.png',fullPage:true});
- console.log('UI smoke passed: growing RTL segments, busy controls, timestamp toggle, settings');
+ await page.evaluate(()=>{
+   window.pollStats={active:0,max:0,calls:0};
+   window.pywebview={api:{platform_info:async()=>({platform:'darwin'}),snapshot:async()=>{
+     const stats=window.pollStats;stats.calls++;stats.active++;stats.max=Math.max(stats.max,stats.active);
+     await new Promise(resolve=>setTimeout(resolve,650));stats.active--;return {...snapshot};
+   }}};
+   window.dispatchEvent(new Event('pywebviewready'));
+ });
+ await page.waitForTimeout(1500);
+ const stats=await page.evaluate(()=>window.pollStats);
+ if(stats.max!==1||stats.calls<2)throw Error('snapshot polling overlaps or stopped');
+ console.log('UI smoke passed: incremental RTL rendering, selection preserved, single-flight polling, controls and times');
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});

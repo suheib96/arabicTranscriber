@@ -29,7 +29,7 @@ es wird kein lokaler HTTP-Server benötigt.
 
 1. Auf der [offiziellen Modellseite](https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026)
    anmelden und die Zugangsbedingungen mit dem eigenen Account akzeptieren.
-2. Eigenen Hugging-Face-**Lesetoken** in „Modell einrichten“ eintragen. Er bleibt
+2. Eigenen Hugging-Face-**Lesetoken** in „Einstellungen“ eintragen. Er bleibt
    nur im Speicher des Auftrags und wird danach entfernt. Alternativ den Token
    lokal mit `hf auth login` hinterlegen oder `HF_TOKEN` als Umgebungsvariable
    setzen. Niemals Token in Git, Chat oder geteilte Pakete kopieren.
@@ -60,7 +60,7 @@ Vorbereitung, YouTube-Download, Modellladen und Transkription haben getrennte
 Statusanzeigen. Nur messbare Stadien zeigen einen Prozentsatz.
 
 Audio wird auf temporärem Datenträger in Mono/16 kHz dekodiert, in höchstens
-24-Sekunden-Fenstern mit bevorzugtem Schnitt in naher Stille verarbeitet und
+12-Sekunden-Fenstern mit bevorzugtem Schnitt in naher Stille verarbeitet und
 nicht vollständig in RAM geladen. Erkannte Abschnitte erscheinen sofort.
 Sehr stille Fenster werden konservativ übersprungen; ursprüngliche Offsets
 bleiben erhalten. Keine Sprechererkennung und keine garantierte Echtzeit.
@@ -76,12 +76,29 @@ Word-Format; es werden keine DOCX-Dateien als `.doc` ausgegeben. Die App bettet
 frei lizenzierte Schriften in DOCX und PDF ein. PDF verwendet HarfBuzz und
 bidirektionales Layout, TXT ist UTF-8.
 
-Abbrechen erhält fertige Abschnitte. FFmpeg wird beendet, Downloads reagieren
-an ihren Fortschrittspunkten und die Generierung an der nächsten Decoder-Stufe.
-Ein laufender HF-Dateidownload, Modellaufbau oder Encoder-Aufruf kann erst nach
-Rückkehr der jeweiligen Bibliotheksoperation anhalten. Währenddessen ist kein
-zweiter Auftrag möglich. Vor dem Schließen wichtige Ergebnisse kopieren/exportieren;
-es gibt noch keine automatische Sitzungswiederherstellung.
+Abbrechen erhält fertige Abschnitte. Die Verarbeitung läuft in einem eigenen
+Prozess. Reagiert eine Bibliothek nicht auf Abbrechen, beendet die App diesen
+Prozess nach einer kurzen Schonfrist mitsamt seinen Medien-Hilfsprozessen.
+Nach jedem Auftrag wird der Modellprozess geschlossen und sein RAM freigegeben;
+der Downloadcache auf der Festplatte bleibt erhalten. Das erneute Laden bei einem
+weiteren Auftrag ist ein bewusster Kompromiss zugunsten freier Systemressourcen.
+
+CPU-Verarbeitung nutzt höchstens vier Rechenthreads und einen Inter-op-Thread.
+Vor dem Modellladen wird der verfügbare RAM bzw. CUDA-Grafikspeicher geprüft.
+Der Float32-Pfad veranschlagt bei diesem Checkpoint rund 9,9 GB freien RAM
+(Parameter plus geschätzter Arbeitsreserve), CUDA/Float16 rund 5,7 GB freien
+Grafikspeicher. Das sind vorsichtige Schätzungen, keine garantierten Spitzenwerte.
+16 GB Gesamtspeicher können bei geöffneten anderen Apps zu knapp sein; auf einem
+Windows-PC mit 32 GB RAM bleibt mehr Reserve. Unified Memory ist keine
+Voraussetzung: CPU arbeitet auch unter Windows mit normalem RAM. CUDA nutzt die
+separate NVIDIA-GPU und deren VRAM, sofern das gebaute PyTorch diese unterstützt.
+
+Vor dem Schließen wichtige Ergebnisse kopieren/exportieren; es gibt noch keine
+automatische Sitzungswiederherstellung. Lokale rotierende Diagnoselogs enthalten
+nur Phasen, Laufzeiten, Prozessspeicher und Fehlerklassen, keine URLs, Dateinamen,
+Tokens oder Transkripte. macOS: `~/Library/Logs/ArabicTranscriber/runtime.log`;
+Windows: `%LOCALAPPDATA%\ArabicTranscriber\logs\runtime.log`.
+
 
 ## Tests
 
@@ -92,12 +109,15 @@ uv run ruff format --check src tests scripts
 uv run python -m arabic_transcriber.app --smoke --smoke-report build/native-smoke.json
 uv run python scripts/check_smoke.py build/native-smoke.json
 uv run python -m arabic_transcriber.app --self-check --smoke-report build/package-check.json
+uv run python -m arabic_transcriber.app --worker-check --smoke-report build/worker-check.json
 ```
 
 Die kleinen Verhaltenstests verwenden echtes FFmpeg und echte Exporte.
 Nur große Inferenz und Live-Netzwerk werden durch externe Adapter ersetzt.
 `--self-check` prüft Runtime-Imports, Node, FFmpeg und Exporte, **keine Inferenz**.
-Der native Smoke öffnet das Fenster, prüft die echte Bridge und schließt es wieder.
+`--worker-check` prüft echte Prozessstarts, fortlaufende Segmente, Abbruch eines
+nativ blockierten Workers und Neustart ohne Modellgewichte. Der native Smoke
+öffnet das Fenster, prüft die echte Bridge und schließt es wieder.
 Für den zusätzlichen HTML-Bedientest (Node/Playwright nur Entwicklung):
 
 ```sh
@@ -139,16 +159,24 @@ uv run python scripts/check_smoke.py build/package-smoke.json
 ```
 
 Windows 11 x64: derselbe Build-Befehl erzeugt einen vollständigen App-Ordner
-und eine ZIP. Die ZIP benötigt vorhandenes WebView2. Für einen Setup-Assistenten
-[Inno Setup 6](https://jrsoftware.org/isinfo.php) installieren, den offiziellen
-[WebView2-Installer](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-als `build/MicrosoftEdgeWebview2Setup.exe` speichern und seine Microsoft-Signatur
-prüfen. Dann in PowerShell:
+mit `Arabic Transcriber.exe` und eine ZIP. Die EXE muss mit dem gesamten Ordner
+verteilt werden; sie ist keine einzelne selbstentpackende Datei. Ein Setup ist
+für Empfänger einfacher. Auf dem Windows-Buildrechner einmalig uv und
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) installieren, den Quellcode
+kopieren/auschecken und im Projektordner in PowerShell ausführen:
 
 ```powershell
-& 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' scripts/windows-installer.iss
-uv run python scripts/archive_package.py
+.\scripts\build_windows_setup.ps1
 ```
+
+Der Helfer installiert die Entwicklungsabhängigkeiten, baut die native App,
+lädt den offiziellen Microsoft-WebView2-Bootstrapper, prüft dessen Signatur und
+erstellt `dist/release/ArabicTranscriber-Windows-x64-Setup.exe` samt Prüfsumme.
+Optional konfigurierte Signier-Secrets werden berücksichtigt. Diese Schritte
+benötigen keinen Mac-spezifischen Codewechsel und keinen Unified Memory.
+Empfänger starten nur die Setup-EXE und danach die App; Python oder Terminal
+sind bei ihnen nicht erforderlich. Der Hugging-Face-Modellzugang und der
+Modellcache müssen auf jedem Zielrechner einmal eingerichtet werden.
 
 CI führt diese Schritte auf Windows aus. Der Setup-Assistent installiert
 WebView2 ohne separate Terminalbefehle; Internet ist für den Bootstrapper nötig.
@@ -168,8 +196,8 @@ git branch -M main
 git remote add origin https://github.com/OWNER/REPOSITORY.git
 git push -u origin main
 # Nach erfolgreichem CI und lokalem Test:
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 `.github/workflows/build.yml` testet macOS/Windows, baut native Pakete und stellt

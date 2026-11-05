@@ -41,6 +41,6 @@ if os.name == 'nt':
 else:
     app = BUNDLE(exe, a.binaries, a.datas, name='Arabic Transcriber.app', bundle_identifier='org.arabictranscriber.desktop',
                  info_plist={'NSHighResolutionCapable': True, 'LSMinimumSystemVersion': '14.0',
-                             'CFBundleShortVersionString':'0.1.0',
+                             'CFBundleShortVersionString':'0.1.1',
                              'NSHumanReadableCopyright':'Arabic Transcriber contributors'},
                  codesign_identity=os.environ.get('APPLE_SIGN_IDENTITY') or None)

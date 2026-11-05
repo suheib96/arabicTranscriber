@@ -2,7 +2,7 @@
 [Setup]
 AppId={{7542E58C-C14D-405B-95AA-BD414403BA44}
 AppName={#AppName}
-AppVersion=0.1.0
+AppVersion=0.1.1
 DefaultDirName={localappdata}\Programs\ArabicTranscriber
 DefaultGroupName={#AppName}
 PrivilegesRequired=lowest

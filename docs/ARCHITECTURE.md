@@ -7,7 +7,10 @@ content or transcript injection via HTML. JS builds transcript nodes with
 `textContent`; model output is never executable markup. Tokens are entered in
 a password field, passed only to the worker, never returned in snapshots.
 
-`Job` owns a single background thread and revisioned, locked snapshots.
+`Job` owns a lightweight supervisor thread and a spawn worker process, with
+revisioned locked snapshots. Model/native calls and their GIL are isolated from
+the UI process. After a 0.5-second cancellation grace period, an unresponsive
+worker and its descendants are terminated. Process exit releases model RAM.
 Completed segments are immutable timeline values (`start`, `end`, `text`).
 A new job clears the prior result only after valid input and after the previous
 worker has stopped. The frontend polls snapshots every 400 ms; percentages
@@ -24,9 +27,11 @@ streams; yt-dlp handles its network protocols. Input URLs are structured values.
 `CohereRecognizer` is the sole ASR boundary. Fixed official model ID and `ar`,
 local-first HF cache, no cloud fallback or alternate ASR. A conservative
 float32 CPU option, float16 CUDA and experimental float32 MPS are explicit.
-One model instance is retained per process and batch size is one. Download,
-model loading and encoder kernels are not preemptible; cancellation is observed
-before/after them and via decoder stopping criteria. Lack of access is a setup
+Batch size is one, windows are bounded to 12 seconds, CPU threads are capped at
+four with one inter-op thread, and weights load directly at target device/dtype.
+A RAM/VRAM preflight estimates parameter memory plus 1.5 GiB working reserve.
+Individual download/model calls still have cooperative cancellation limits; the
+supervisor can terminate the isolated worker if those calls fail to return. Lack of access is a setup
 prerequisite, not replaced with demo output.
 
 `exports.py` renders the same timeline/text structure for copying and export.
@@ -38,3 +43,11 @@ after successful generation. No inference is run for export or toggling.
 The fast tests observe these public boundaries. Model inference and network
 are the only faked external adapters. Real FFmpeg, document formats and native
 bridge are exercised separately. See VERIFICATION.md for actual evidence.
+
+
+Operational logging is configured only at app startup and rotates in the user's
+local log directory. It records phases, timings, worker RSS and available memory,
+without URLs, file paths, transcript, tokens or arbitrary exception messages.
+`--worker-check` exercises frozen process spawning, IPC and forced cancellation.
+The native entry point calls `multiprocessing.freeze_support()` before argument
+parsing or GUI initialization, including Windows resource-tracker invocations.
