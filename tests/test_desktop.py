@@ -53,3 +53,21 @@ def test_desktop_document_contains_local_assets_without_loopback_dependency():
     assert 'href="style.css"' not in html
     assert "data:font/ttf;base64," in html
     assert "window.desktopSmoke" in html
+
+
+def test_file_picker_uses_valid_native_filters_and_returns_selected_unicode_path(tmp_path):
+    from webview.util import parse_file_type
+
+    selected = str(tmp_path / "مقابلة Berlin.mp4")
+
+    class NativeDialog:
+        def create_file_dialog(self, dialog_type, **options):
+            # Exercise the real validation performed by pywebview before any OS dialog opens.
+            for file_type in options["file_types"]:
+                parse_file_type(file_type)
+            assert options["allow_multiple"] is False
+            return (selected,)
+
+    api = DesktopAPI()
+    api.window = NativeDialog()
+    assert api.choose_file() == selected

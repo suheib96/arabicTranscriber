@@ -28,7 +28,7 @@ class DesktopAPI:
             webview.FileDialog.OPEN,
             allow_multiple=False,
             file_types=(
-                "Audio / Video (*.wav;*.mp3;*.m4a;*.mp4;*.mkv;*.webm;*.ogg;*.flac)",
+                "Audio und Video (*.wav;*.mp3;*.m4a;*.mp4;*.mkv;*.webm;*.ogg;*.flac)",
                 "Alle Dateien (*.*)",
             ),
         )

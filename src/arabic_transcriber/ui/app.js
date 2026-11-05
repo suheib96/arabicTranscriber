@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 let source = 'file', selectedFile = '', snapshot = {segments: [], status: 'idle'};
-let polling = false, renderedSegments = [], renderedTimes = false;
+let polling = false, renderedSegments = [], renderedTimes = false, localError = '';
 const timeLabel = seconds => {
   const value = Math.floor(seconds), hours = Math.floor(value / 3600);
   const rest = `${String(Math.floor(value / 60) % 60).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
@@ -32,7 +32,8 @@ function renderTranscript(segments) {
 function render() {
   const busy = ['running', 'cancelling'].includes(snapshot.status), segments = snapshot.segments || [];
   $('stage').textContent = snapshot.stage || 'Bereit';
-  $('error').hidden = !snapshot.error; $('error').textContent = snapshot.error || '';
+  const message = localError || snapshot.error || '';
+  $('error').hidden = !message; $('error').textContent = message;
   $('progress').hidden = !busy; $('dot').classList.toggle('working', busy);
   $('elapsed').textContent = busy ? timeLabel(snapshot.elapsed_seconds || 0) : '';
   if (snapshot.progress == null) { $('progress').removeAttribute('value'); $('percent').textContent = ''; }
@@ -43,8 +44,8 @@ function render() {
   $('empty').hidden = segments.length > 0; $('segmentCount').textContent = segments.length || '';
   renderTranscript(segments);
 }
-function error(e) { $('error').hidden = false; $('error').textContent = String(e.message || e); }
-function feedback(text) { $('feedback').textContent = text; setTimeout(() => $('feedback').textContent = '', 3500); }
+function error(e) { localError = String(e.message || e); $('error').hidden = false; $('error').textContent = localError; }
+function feedback(text) { localError = ''; $('error').hidden = !snapshot.error; $('feedback').textContent = text; setTimeout(() => $('feedback').textContent = '', 3500); }
 function selectSource(value) {
   source = value; $('choose').hidden = value !== 'file'; $('urlLabel').hidden = value !== 'youtube';
   for (const v of ['file', 'youtube']) { $(v + 'Tab').classList.toggle('selected', v === value); $(v + 'Tab').setAttribute('aria-pressed', String(v === value)); }
@@ -56,11 +57,11 @@ $('settingsButton').onclick = () => {
 };
 $('access').onclick = async event => { event.preventDefault(); try { await pywebview.api.open_model_access(); } catch(e) { error(e); } };
 $('choose').onclick = async () => {
-  try { const path = await pywebview.api.choose_file(); if (path) { selectedFile = path; $('filename').textContent = path.split(/[\\/]/).pop(); } } catch(e) { error(e); }
+  try { const path = await pywebview.api.choose_file(); if (path) { selectedFile = path; $('filename').textContent = path.split(/[\\/]/).pop(); localError = ''; $('error').hidden = true; } } catch(e) { error(e); }
 };
 $('start').onclick = async () => {
   try {
-    $('start').disabled = true;
+    localError = ''; $('error').hidden = true; $('start').disabled = true;
     const result = await pywebview.api.start(source, source === 'file' ? selectedFile : $('url').value,
       {token: $('token').value, offline: $('offline').checked, device: $('device').value});
     $('token').value = '';
@@ -77,7 +78,7 @@ $('copy').onclick = async () => { try { const r = await pywebview.api.copy_all($
 $('export').onclick = async () => { try { const r = await pywebview.api.export($('format').value, $('outputTimes').checked); if (r.error) error(r.error); else if (r.path) feedback('Gespeichert'); } catch(e) { error(e); } };
 async function poll() {
   if (!polling) return;
-  try { snapshot = await pywebview.api.snapshot(); render(); }
+  try { const next = await pywebview.api.snapshot(); if (next.error && next.error !== snapshot.error) localError = ''; snapshot = next; render(); }
   catch(e) { error('Verbindung zur Verarbeitung unterbrochen.'); }
   finally { if (polling) setTimeout(poll, 400); }
 }

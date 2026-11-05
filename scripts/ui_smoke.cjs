@@ -11,6 +11,14 @@ require('fs').mkdirSync('.scratch/arabic-transcriber',{recursive:true});
  await page.evaluate(()=>document.fonts.ready);
  if(!await page.evaluate(()=>document.fonts.check('21px NotoArabic')))throw Error('Arabic font missing');
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-idle.png'});
+ await page.evaluate(()=>window.pywebview={api:{choose_file:async()=>{throw Error('Dialog nicht verfügbar');}}});
+ await page.locator('#choose').click();
+ await page.evaluate(()=>render());
+ if(!await page.locator('#error').isVisible())throw Error('polling hides dialog error immediately');
+ await page.evaluate(()=>window.pywebview.api.choose_file=async()=>'/tmp/fixture.wav');
+ await page.locator('#choose').click();
+ if(await page.locator('#error').isVisible())throw Error('successful selection does not clear dialog error');
+
  await page.evaluate(()=>{
    window.snapshot={status:'running',stage:'Transkription läuft · TESTFIXTUR',progress:0.42,segments:[
    {start:0,end:24,text:'مرحبًا بكم. نتحدث اليوم عن أهمية التعلم وتبادل المعرفة.'},

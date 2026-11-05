@@ -1,3 +1,25 @@
+# Update 2026-11-05 — version 0.1.2
+
+- Reproduced the exact native picker failure with pywebview's real filter
+  parser at the public `DesktopAPI.choose_file` boundary. The slash in the
+  description `Audio / Video` was invalid. `Audio und Video` passes validation.
+- Built the actual 0.1.2 macOS bundle, opened its native Open panel and selected
+  a generated WAV file. The filename appeared in the app and Transcribe became
+  available. No inference was started with this silent picker fixture. Further
+  interactive cancellation testing stopped when the user resumed app use.
+- Frontend regression verified that polling preserves a local dialog error and
+  successful selection clears it. Existing incremental transcript and polling
+  checks remain green. Fourteen pytest checks and Ruff lint/format passed.
+- Bundle version 0.1.2, ad-hoc signature and release ZIP SHA256 verified.
+- During subsequent user interaction the real app reported insufficient memory:
+  approximately 9.9 GB required and 2.7 GB available. Full model inference remains
+  unverified. This is a current observation, not proof of yesterday's hang.
+- User supplied the empty public target repository
+  `https://github.com/suheib96/arabicTranscriber`. CI uses current explicit
+  macOS 15 arm64 and Windows Server 2025 x64 runners. Initial remote CI and
+  release results will be recorded after execution. Windows native dialog and
+  full inference have not yet been accepted on user hardware.
+
 # Update 2026-11-05 — version 0.1.1
 
 The exact reported two-minute YouTube hang has not been reproduced: URL, device
