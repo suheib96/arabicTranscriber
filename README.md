@@ -45,7 +45,9 @@ es wird kein lokaler HTTP-Server benötigt.
    nicht zum verteilten App-Bundle.
 
 CPU/Float32 ist der konservative Standard. NVIDIA CUDA/Float16 kann bei einer
-passenden PyTorch-Installation ausgewählt werden; CUDA-Pakete/Hardware sind
+passenden PyTorch-Installation ausgewählt werden. Das Windows-Paket von v0.1.2
+enthält nachweislich PyTorch `2.15.0+cpu` und nutzt deshalb die CPU; CUDA benötigt
+einen separat gebauten CUDA-fähigen Runtime-Build. CUDA-Pakete/Hardware sind
 separat zu prüfen. Apple MPS/Float32 ist **experimentell** und muss mit genau
 diesem Modell getestet werden. Es gibt keinen Ersatzmotor und keine
 Cloud-Transkription. Gated Zugang, Speicher und Hardware sind reale Voraussetzungen.
@@ -188,16 +190,18 @@ Die FFmpeg-Lizenz-/Quellcodeanforderungen für öffentliche Weitergabe stehen in
 
 ## GitHub Builds und Releases aktivieren
 
-Ziel-Repository: [suheib96/arabicTranscriber](https://github.com/suheib96/arabicTranscriber).
-Der erste Build wird auf `main` geprüft; erst danach wird der Versionstag gepusht:
+Repository: [suheib96/arabicTranscriber](https://github.com/suheib96/arabicTranscriber).
+[Version 0.1.2](https://github.com/suheib96/arabicTranscriber/releases/tag/v0.1.2)
+ist als Testversion mit Mac-ZIP, Windows-Setup, portablem Windows-ZIP und
+Prüfsummen verfügbar. Mac-/Windows-Builds und Paketprüfungen sind erfolgreich;
+echte Modellinferenz ist noch nicht verifiziert.
+
+Nach Versionsänderung, Commit und erfolgreichem `main`-Build einen neuen Tag
+pushen, beispielsweise für die nächste Version:
 
 ```sh
-git branch -M main
-git remote add origin https://github.com/suheib96/arabicTranscriber.git
-git push -u origin main
-# Nach erfolgreichem CI und lokalem Test:
-git tag v0.1.2
-git push origin v0.1.2
+git tag -a v0.1.3 -m "Arabic Transcriber 0.1.3"
+git push origin v0.1.3
 ```
 
 `.github/workflows/build.yml` testet auf macOS 15 (Apple Silicon) und Windows Server 2025 x64, baut native Pakete und stellt

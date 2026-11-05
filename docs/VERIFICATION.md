@@ -16,9 +16,23 @@
   unverified. This is a current observation, not proof of yesterday's hang.
 - User supplied the empty public target repository
   `https://github.com/suheib96/arabicTranscriber`. CI uses current explicit
-  macOS 15 arm64 and Windows Server 2025 x64 runners. Initial remote CI and
-  release results will be recorded after execution. Windows native dialog and
-  full inference have not yet been accepted on user hardware.
+  macOS 15 arm64 and Windows Server 2025 x64 runners. Initial main CI
+  [42009368433](https://github.com/suheib96/arabicTranscriber/actions/runs/42009368433)
+  passed both OS test/UI suites, both frozen worker/runtime/window checks,
+  archive uploads and the Windows installer build. Windows uses PyTorch
+  `2.15.0+cpu`; CUDA is not included in this installer. Worker cancellation was
+  0.73 s on Windows and 0.76 s on macOS. These checks use no model weights.
+  The first Windows UI check exposed cp1252 stdout encoding; explicit UTF-8
+  transport passed both a local cp1252 regression and the actual Windows runner.
+  Tag `v0.1.2` independently rebuilt and passed all tests/packages in
+  [release run 42011007646](https://github.com/suheib96/arabicTranscriber/actions/runs/42011007646).
+  [Release 0.1.2](https://github.com/suheib96/arabicTranscriber/releases/tag/v0.1.2)
+  is published as a prerelease with Mac ZIP, Windows portable ZIP, Windows Setup
+  EXE and their three SHA256 files. All three package hashes match GitHub's
+  independently calculated upload digests. Frozen runtime/worker reports from
+  both final release builds report success and explicitly no real inference.
+  Windows native dialog acceptance, installer execution on user hardware and
+  full model inference remain unverified.
 
 # Update 2026-11-05 — version 0.1.1
 
