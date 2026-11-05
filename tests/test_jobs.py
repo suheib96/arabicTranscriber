@@ -1,6 +1,6 @@
-import threading
 import time
 import wave
+from multiprocessing import get_context
 
 import numpy as np
 
@@ -44,21 +44,24 @@ def test_local_media_grows_in_order_with_real_decode_and_finishes(tmp_path):
     assert state["segments"][1]["text"] == "مرحبًا بكم في Berlin 2026."
 
 
+class SlowRecognizer(Recognizer):
+    def __init__(self, entered_second, release):
+        self.calls = 0
+        self.entered_second = entered_second
+        self.release = release
+
+    def transcribe(self, audio, cancel):
+        self.calls += 1
+        if self.calls == 2:
+            self.entered_second.set()
+            self.release.wait(5)
+        return "نص محفوظ"
+
+
 def test_cancel_retains_completed_segments_and_new_job_can_start(tmp_path):
-    entered_second = threading.Event()
-    release = threading.Event()
-
-    class SlowRecognizer(Recognizer):
-        calls = 0
-
-        def transcribe(self, audio, cancel):
-            self.calls += 1
-            if self.calls == 2:
-                entered_second.set()
-                release.wait(5)
-            return "نص محفوظ"
-
-    job = Job(recognizer=SlowRecognizer(), segment_seconds=1)
+    entered_second = get_context("spawn").Event()
+    release = get_context("spawn").Event()
+    job = Job(recognizer=SlowRecognizer(entered_second, release), segment_seconds=1)
     path = str(audio_file(tmp_path))
     assert job.start("file", path, {})["ok"]
     assert entered_second.wait(5)
@@ -74,22 +77,33 @@ def test_cancel_retains_completed_segments_and_new_job_can_start(tmp_path):
     assert wait_for(job, lambda s: s["status"] == "completed")["progress"] == 1
 
 
+class DownloadedAudio:
+    def __init__(self, path):
+        self.path = path
+
+    def __call__(self, url, directory, cancel, report):
+        report("Audio wird heruntergeladen", 0.5)
+        return self.path
+
+
+def unavailable_download(*args):
+    raise RuntimeError("YouTube-Audio nicht verfügbar.")
+
+
+class MissingModel(Recognizer):
+    def load(self, options, cancel, stage):
+        raise RuntimeError("Modellzugang bei Hugging Face freischalten.")
+
+
 def test_youtube_adapter_uses_same_job_path_and_surfaces_failure(tmp_path):
     path = audio_file(tmp_path)
 
-    def downloaded(url, directory, cancel, report):
-        report("Audio wird heruntergeladen", 0.5)
-        return path
-
-    job = Job(recognizer=Recognizer(), downloader=downloaded)
+    job = Job(recognizer=Recognizer(), downloader=DownloadedAudio(path))
     assert not job.start("youtube", "https://example.com/watch?v=x", {})["ok"]
     assert job.start("youtube", "https://youtu.be/example", {})["ok"]
     assert wait_for(job, lambda s: s["status"] == "completed")["segments"]
 
-    def unavailable(*args):
-        raise RuntimeError("YouTube-Audio nicht verfügbar.")
-
-    job = Job(recognizer=Recognizer(), downloader=unavailable)
+    job = Job(recognizer=Recognizer(), downloader=unavailable_download)
     job.start("youtube", "https://youtu.be/example", {})
     assert (
         wait_for(job, lambda s: s["status"] == "error")["error"] == "YouTube-Audio nicht verfügbar."
@@ -108,10 +122,6 @@ def test_silence_skipping_keeps_original_offsets_and_missing_model_is_actionable
     state = wait_for(job, lambda s: s["status"] == "completed")
     assert state["segments"][0]["start"] == 1
 
-    class MissingModel(Recognizer):
-        def load(self, options, cancel, stage):
-            raise RuntimeError("Modellzugang bei Hugging Face freischalten.")
-
     job = Job(recognizer=MissingModel())
     job.start("file", str(path), {})
     assert "Hugging Face" in wait_for(job, lambda s: s["status"] == "error")["error"]
@@ -125,3 +135,41 @@ def test_playlist_and_channel_urls_are_rejected_before_download():
         "https://www.youtube.com/watch?list=123",
     ):
         assert not job.start("youtube", url, {})["ok"]
+
+
+class BlockedRecognizer(Recognizer):
+    def __init__(self, entered):
+        self.entered = entered
+
+    def load(self, options, cancel, stage):
+        stage("Modell wird geladen")
+        self.entered.set()
+        import ctypes
+        import sys
+
+        # Simulate a native extension that holds the GIL as well as ignoring cancel.
+        if sys.platform == "win32":
+            ctypes.PyDLL("kernel32").Sleep(30_000)
+        else:
+            ctypes.PyDLL(None).sleep(30)
+
+
+def test_cancel_interrupts_stuck_model_and_allows_restart(tmp_path):
+    from multiprocessing import get_context
+
+    entered = get_context("spawn").Event()
+    job = Job(recognizer=BlockedRecognizer(entered))
+    path = str(audio_file(tmp_path, 1))
+    assert job.start("file", path, {})["ok"]
+    assert entered.wait(5)
+    started = time.monotonic()
+    job.cancel()
+    while time.monotonic() - started < 2:
+        if job.snapshot()["status"] == "cancelled":
+            break
+        time.sleep(0.01)
+    assert job.snapshot()["status"] == "cancelled"
+    assert time.monotonic() - started < 2
+    assert job.start("file", path, {})["ok"]
+    job.cancel()
+    wait_for(job, lambda s: s["status"] == "cancelled")

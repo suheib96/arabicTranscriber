@@ -63,3 +63,78 @@ def self_check(destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report["ok"]
+
+
+class _WorkerProbe:
+    """Only used by the explicit package check; never a transcription fallback."""
+
+    def __init__(self, blocked=False):
+        self.blocked = blocked
+
+    def load(self, options, cancel, stage):
+        if self.blocked:
+            stage("Worker-Prüfung")
+            import ctypes
+            import sys
+
+            # PyDLL deliberately holds this worker's GIL, like an uncooperative native call.
+            if sys.platform == "win32":
+                ctypes.PyDLL("kernel32").Sleep(30_000)
+            else:
+                ctypes.PyDLL(None).sleep(30)
+
+    def transcribe(self, audio, cancel):
+        return "اختبار"
+
+
+def worker_check(destination):
+    """Exercise frozen spawn/IPC/cancel/restart without model access or weights."""
+    import time
+
+    from .jobs import Job
+
+    report = {"ok": False, "real_model_inference": False}
+
+    def wait(job, predicate, timeout=15):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            state = job.snapshot()
+            if predicate(state):
+                return state
+            if state["status"] == "error":
+                raise RuntimeError(state["error"])
+            time.sleep(0.02)
+        raise RuntimeError("Worker check timed out")
+
+    job = None
+    try:
+        with tempfile.TemporaryDirectory(prefix="arabic-worker-check-") as temporary:
+            path = Path(temporary) / "fixture.wav"
+            with wave.open(str(path), "wb") as wav:
+                wav.setparams((1, 2, 16000, 0, "NONE", ""))
+                wav.writeframes(b"\x00\x10" * 32000)
+            job = Job(recognizer=_WorkerProbe(), segment_seconds=1)
+            assert job.start("file", str(path), {})["ok"]
+            state = wait(job, lambda s: s["status"] == "completed")
+            assert len(state["segments"]) == 2
+            report["spawn_and_segments"] = True
+            job = Job(recognizer=_WorkerProbe(blocked=True))
+            assert job.start("file", str(path), {})["ok"]
+            wait(job, lambda s: s["stage"] == "Worker-Prüfung")
+            started = time.monotonic()
+            job.cancel()
+            wait(job, lambda s: s["status"] == "cancelled", timeout=2)
+            report["cancel_seconds"] = round(time.monotonic() - started, 2)
+            assert job.start("file", str(path), {})["ok"]
+            job.cancel()
+            wait(job, lambda s: s["status"] == "cancelled", timeout=2)
+            report["restart"] = True
+            report["ok"] = True
+    except Exception as error:
+        report["error"] = type(error).__name__ + ": " + str(error)
+    finally:
+        if job:
+            job.close()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return report["ok"]

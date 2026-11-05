@@ -20,13 +20,24 @@ def ui_document():
 
 
 def main():
+    import multiprocessing
+
+    multiprocessing.freeze_support()
+    from .runlog import configure
+
+    configure()
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--smoke", action="store_true", help="Launch native bridge check, then close"
     )
     parser.add_argument("--smoke-report", type=Path)
     parser.add_argument("--self-check", action="store_true")
+    parser.add_argument("--worker-check", action="store_true")
     args = parser.parse_args()
+    if args.worker_check:
+        from .diagnostics import worker_check
+
+        raise SystemExit(0 if worker_check(args.smoke_report or Path("worker-check.json")) else 1)
     if args.self_check:
         from .diagnostics import self_check
 
@@ -44,7 +55,7 @@ def main():
         background_color="#f6f5f1",
     )
     api.window = window
-    window.events.closing += lambda: api.cancel()
+    window.events.closing += lambda: api.close()
 
     def smoke():
         import os

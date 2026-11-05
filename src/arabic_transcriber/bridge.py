@@ -48,6 +48,15 @@ class DesktopAPI:
             self.job.cancel()
         return {"ok": True}
 
+    def close(self):
+        if self.job:
+            self.job.close()
+
+    def platform_info(self):
+        import sys
+
+        return {"platform": sys.platform}
+
     def open_model_access(self):
         import webbrowser
 

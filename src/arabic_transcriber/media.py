@@ -81,7 +81,7 @@ def download_audio(url, directory, cancel, report):
         check_cancel(cancel)
         total = event.get("total_bytes") or event.get("total_bytes_estimate")
         fraction = min(event.get("downloaded_bytes", 0) / total, 1) if total else None
-        report("Audio wird heruntergeladen", fraction)
+        report("Audio laden", fraction)
 
     options = {
         "format": "bestaudio/best",
@@ -118,7 +118,7 @@ def download_audio(url, directory, cancel, report):
 
 def decode(source, directory, cancel, report):
     target = directory / "decoded.wav"
-    report("Audio wird vorbereitet", None)
+    report("Audio vorbereiten", None)
     # Redirect both streams to disk: no unconsumed pipe can deadlock long inputs.
     with (directory / "decode.log").open("w+b") as log:
         process = subprocess.Popen(
@@ -129,6 +129,8 @@ def decode(source, directory, cancel, report):
                 "-loglevel",
                 "error",
                 "-y",
+                "-threads",
+                "1",
                 "-i",
                 str(source),
                 "-vn",
