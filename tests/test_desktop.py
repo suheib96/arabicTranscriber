@@ -71,3 +71,25 @@ def test_file_picker_uses_valid_native_filters_and_returns_selected_unicode_path
     api = DesktopAPI()
     api.window = NativeDialog()
     assert api.choose_file() == selected
+
+
+def test_desktop_exposes_queue_selection_pause_and_memory_controls(tmp_path):
+    from arabic_transcriber.jobs import Job
+
+    api = DesktopAPI(job=Job())
+    try:
+        assert api.pause()["ok"]
+        first_path, second_path = tmp_path / "first.wav", tmp_path / "second.wav"
+        first_path.write_bytes(b"fixture-not-decoded-while-paused")
+        second_path.write_bytes(b"fixture-not-decoded-while-paused")
+        first = api.start("file", str(first_path), {})
+        second = api.start("file", str(second_path), {})
+        assert api.select(second["id"])["ok"]
+        assert api.snapshot()["selected_id"] == second["id"]
+        assert api.release_memory()["ok"]
+        assert api.remove(first["id"])["ok"]
+        assert len(api.snapshot()["items"]) == 1
+        assert api.cancel(second["id"])["ok"]
+        assert api.resume()["ok"]
+    finally:
+        api.close()

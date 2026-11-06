@@ -5,6 +5,11 @@ Minimalistische Desktop-App für lokale arabische Transkription mit
 Datei-/YouTube-Import, wachsendes RTL-Transkript, Fortschritt, Abbrechen,
 Alles kopieren sowie TXT, Word DOCX und PDF.
 
+Lokaler Entwicklungsstand **0.2.0**: serielle Warteschlange mit YouTube-Titeln,
+Pause/Fortsetzen und Modellwiederverwendung. Der veröffentlichte Release 0.1.2
+enthält diese Erweiterung noch nicht. Neue Änderungen sind lokal committet;
+ein Push oder Release von 0.2.0 erfolgt separat.
+
 ## Lokal starten
 
 Voraussetzungen für Entwicklung: macOS 14+ (Apple Silicon) oder Windows 11 x64,
@@ -78,12 +83,39 @@ Word-Format; es werden keine DOCX-Dateien als `.doc` ausgegeben. Die App bettet
 frei lizenzierte Schriften in DOCX und PDF ein. PDF verwendet HarfBuzz und
 bidirektionales Layout, TXT ist UTF-8.
 
-Abbrechen erhält fertige Abschnitte. Die Verarbeitung läuft in einem eigenen
-Prozess. Reagiert eine Bibliothek nicht auf Abbrechen, beendet die App diesen
-Prozess nach einer kurzen Schonfrist mitsamt seinen Medien-Hilfsprozessen.
-Nach jedem Auftrag wird der Modellprozess geschlossen und sein RAM freigegeben;
-der Downloadcache auf der Festplatte bleibt erhalten. Das erneute Laden bei einem
-weiteren Auftrag ist ein bewusster Kompromiss zugunsten freier Systemressourcen.
+Weitere Dateien oder YouTube-Links können auch während eines Auftrags über
+„Transkribieren“ hinzugefügt werden. Die Warteschlange verarbeitet strikt einen
+Auftrag nach dem anderen. YouTube-Titel werden vorher über eine kleine
+Metadatenabfrage ermittelt; bei fehlenden Titeln bleibt der Link sichtbar.
+Wartende Einträge können entfernt werden. Ein Klick auf eine Zeile wählt deren
+Transkript aus; Kopieren und Export beziehen sich auf diese Auswahl.
+
+„Pause“ hält die ganze Warteschlange am nächsten sicheren Verarbeitungspunkt
+an. Ein laufender Audioabschnitt darf noch fertig werden. Bei Download,
+Dekodierung oder Modellladen kann die Bestätigung entsprechend länger dauern;
+die Oberfläche zeigt dann „Pause angefordert“. Es startet kein Folgeauftrag.
+„Fortsetzen“ arbeitet ab dem letzten vollständig übernommenen Abschnitt weiter.
+
+Das Modell bleibt zwischen direkt aufeinanderfolgenden Aufträgen geladen.
+Während einer bestätigten Pause bleibt es **fünf Minuten** im RAM und wird
+anschließend automatisch entladen. Bei einem nicht reagierenden Schritt wird
+spätestens fünf Minuten nach der Pause-Anforderung der Worker beendet.
+„Speicher freigeben“ beendet ihn sofort, auch wenn die Pause noch nicht bestätigt
+ist. Die Audiodatei und die bestätigten Abschnitte bleiben für das Fortsetzen
+erhalten; ein unterbrochener Abschnitt wird erneut berechnet. Nach einer
+Speicherfreigabe muss das Modell neu geladen, bei vollständigem Cache aber
+nicht erneut heruntergeladen werden. Der Timer läuft im Backend unabhängig vom
+UI-Polling. Ist kein Auftrag mehr offen oder wird die App geschlossen, wird
+der Modellprozess ebenfalls beendet und sein RAM freigegeben.
+
+Abbrechen erhält bereits übernommene Abschnitte und beendet den Auftrag.
+Ein nicht reagierender Worker wird nach kurzer Schonfrist mitsamt seinen
+Medien-Hilfsprozessen beendet, bevor der nächste starten darf. Ein Fehler eines
+Videos stoppt die übrigen Einträge nicht. Fehlender Modellzugang oder zu wenig
+Speicher pausieren die Warteschlange; nach Beheben der Ursache versucht
+„Fortsetzen“ den betroffenen Auftrag erneut. Einstellungen lassen sich während
+der Pause ändern. Die Warteschlange und Transkripte gelten für die geöffnete
+App-Sitzung; vor dem Schließen Ergebnisse exportieren.
 
 CPU-Verarbeitung nutzt höchstens vier Rechenthreads und einen Inter-op-Thread.
 Vor dem Modellladen wird der verfügbare RAM bzw. CUDA-Grafikspeicher geprüft.

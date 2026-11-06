@@ -12,6 +12,15 @@ class DesktopAPI:
     def snapshot(self):
         if self.job is None:
             return {
+                "items": [],
+                "selected_id": None,
+                "active_id": None,
+                "paused": False,
+                "pausing": False,
+                "model_loaded": False,
+                "worker_running": False,
+                "releasing_memory": False,
+                "release_in_seconds": None,
                 "status": "idle",
                 "stage": "Bereit",
                 "progress": None,
@@ -43,9 +52,28 @@ class DesktopAPI:
             self.job = Job()
         return self.job.start(source, value, options or {})
 
-    def cancel(self):
+    def pause(self):
+        if self.job is None:
+            from .jobs import Job
+
+            self.job = Job()
+        return self.job.pause()
+
+    def resume(self, options=None):
+        return self.job.resume(options) if self.job else {"ok": True}
+
+    def release_memory(self):
+        return self.job.release_memory() if self.job else {"ok": True}
+
+    def select(self, identifier):
+        return self.job.select(identifier) if self.job else {"ok": False}
+
+    def remove(self, identifier):
+        return self.job.remove(identifier) if self.job else {"ok": False}
+
+    def cancel(self, identifier=None):
         if self.job:
-            self.job.cancel()
+            self.job.cancel(identifier)
         return {"ok": True}
 
     def close(self):

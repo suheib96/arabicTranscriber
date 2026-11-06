@@ -12,6 +12,24 @@ Provide File / YouTube input selection, file picker or link field, Transcribe, v
 
 An explicitly requested ImageGen sub-agent should generate a visual reference and explain a few concrete design choices. Use the image to inform real frontend controls, not as a screenshot replacement for functioning UI. Preserve the final reference image in the project; discarded variants may remain in `.scratch`.
 
+## Queue and model retention (approved 2026-11-06)
+
+File and YouTube submissions join a FIFO while another task runs. Resolve
+YouTube titles before media download, with an asynchronous small metadata
+request and URL fallback. Only one download/decode/transcription pipeline and
+one model worker may run. Preserve each task's transcript independently;
+selection controls viewing/copy/export and stays independent of the scheduler.
+
+Offer global Pause/Resume and an unobtrusive immediate memory release action.
+Pause at a safe boundary and preserve committed audio offsets. Retain the
+loaded model for five minutes in a confirmed pause, then release it without
+needing UI polls; a stuck unacknowledged pause must also have bounded release.
+Immediate release stops even an unresponsive worker. Resume reloads as needed
+and continues from the last complete checkpoint. Reuse the model across
+successive queued tasks, release it when no unfinished task remains or on close.
+The initial queue is in-session; persistence across app restarts is separate.
+The user requested local Conventional Commits only for this extension.
+
 ## Model and runtime
 
 Fix the speech model identity to `CohereLabs/cohere-transcribe-arabic-07-2026`, with language `ar`. No automatic selection of another ASR model or cloud fallback. The original Hugging Face repository is gated: explain first-run access, use the user's own local read token without logging or committing it, download/cache the model once and support later offline use of local files. Acquiring model access is the user's account action; missing access must not stop development of the rest of the app.
@@ -42,7 +60,7 @@ Use the TDD skill in small vertical red-to-green cycles. The user explicitly aut
 
 Use Conventional Commits for coherent steps. Keep generated artifacts, models, tokens, input media and `.scratch/` outside version control. Package Python, frontend assets and necessary media tools so recipients do not need to install Python or use terminal commands. Prefer a maintainable app bundle/installer over forcing a huge self-extracting single file. Build and test macOS and Windows packages separately on matching operating systems; document CPU architectures and acceleration requirements. Inspect pywebview platform dependencies, especially Windows WebView2, and handle them explicitly.
 
-Implement GitHub Actions for main/PR tests and package builds with downloadable artifacts. Version tags such as `v*` trigger release package builds and upload resulting macOS/Windows assets and checksums to a GitHub Release, with least necessary permissions. Never expose credentials to untrusted PR runs. The project currently has no specified GitHub remote; create/configure local workflows and precise push/tag instructions, but do not invent a repository or claim workflows ran remotely.
+Implement GitHub Actions for main/PR tests and package builds with downloadable artifacts. Version tags such as `v*` trigger release package builds and upload resulting macOS/Windows assets and checksums to a GitHub Release, with least necessary permissions. Never expose credentials to untrusted PR runs. The authorized remote is `https://github.com/suheib96/arabicTranscriber`. Release v0.1.2 was built on GitHub and published; later changes must distinguish local verification from a new remote run or release. The queue extension is currently authorized for local commits only.
 
 ## Signing and delivery
 

@@ -1,5 +1,6 @@
 """Media I/O. Decode to temporary PCM on disk; never load a whole movie into RAM."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -7,7 +8,8 @@ import sys
 import time
 import wave
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 import numpy as np
 
@@ -60,6 +62,28 @@ def youtube_url(value):
         return len(parts) == 2 and parts[0] in ("shorts", "embed") and bool(parts[1])
     except (ValueError, AttributeError):
         return False
+
+
+def youtube_title(url):
+    """Small, bounded public metadata request; never fetch media or use a model."""
+    import ssl
+
+    import certifi
+
+    if not youtube_url(url):
+        raise ValueError("Ungültiger YouTube-Link.")
+
+    endpoint = "https://www.youtube.com/oembed?" + urlencode({"url": url, "format": "json"})
+    with urlopen(
+        Request(endpoint, headers={"User-Agent": "ArabicTranscriber/0.2"}),
+        timeout=8,
+        context=ssl.create_default_context(cafile=certifi.where()),
+    ) as response:
+        info = json.loads(response.read(64_001))
+    title = info.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Titel nicht verfügbar.")
+    return title.strip()[:500]
 
 
 def download_audio(url, directory, cancel, report):
@@ -169,14 +193,14 @@ def decode(source, directory, cancel, report):
     return target
 
 
-def audio_segments(path, seconds=24):
+def audio_segments(path, seconds=24, start_seconds=0):
     """Contiguous windows with a nearby quiet cut. No overlap or timeline compression."""
     with wave.open(str(path), "rb") as wav:
         rate = wav.getframerate()
         frames = wav.getnframes()
         if not frames:
             raise ValueError("Die Datei enthält kein Audio.")
-        position = 0
+        position = min(frames, max(0, round(start_seconds * rate)))
         while position < frames:
             wav.setpos(position)
             samples = np.frombuffer(wav.readframes(int(seconds * rate)), dtype="<i2")

@@ -42,6 +42,7 @@ def test_local_media_grows_in_order_with_real_decode_and_finishes(tmp_path):
     assert state["progress"] == 1
     assert [(s["start"], s["end"]) for s in state["segments"]] == [(0, 1), (1, 2), (2, 3)]
     assert state["segments"][1]["text"] == "مرحبًا بكم في Berlin 2026."
+    job.close()
 
 
 class SlowRecognizer(Recognizer):
@@ -65,16 +66,18 @@ def test_cancel_retains_completed_segments_and_new_job_can_start(tmp_path):
     path = str(audio_file(tmp_path))
     assert job.start("file", path, {})["ok"]
     assert entered_second.wait(5)
-    growing = job.snapshot()
+    growing = wait_for(job, lambda s: len(s["segments"]) == 1)
     assert len(growing["segments"]) == 1
     assert 0 < growing["progress"] < 1
-    assert not job.start("file", path, {})["ok"]
     job.cancel()
     release.set()
     state = wait_for(job, lambda s: s["status"] == "cancelled")
     assert [s["text"] for s in state["segments"]] == ["نص محفوظ"]
-    assert job.start("file", path, {})["ok"]
+    restarted = job.start("file", path, {})
+    assert restarted["ok"]
+    job.select(restarted["id"])
     assert wait_for(job, lambda s: s["status"] == "completed")["progress"] == 1
+    job.close()
 
 
 class DownloadedAudio:
@@ -98,16 +101,22 @@ class MissingModel(Recognizer):
 def test_youtube_adapter_uses_same_job_path_and_surfaces_failure(tmp_path):
     path = audio_file(tmp_path)
 
-    job = Job(recognizer=Recognizer(), downloader=DownloadedAudio(path))
+    job = Job(
+        recognizer=Recognizer(), downloader=DownloadedAudio(path), title_resolver=lambda _: "Video"
+    )
     assert not job.start("youtube", "https://example.com/watch?v=x", {})["ok"]
     assert job.start("youtube", "https://youtu.be/example", {})["ok"]
     assert wait_for(job, lambda s: s["status"] == "completed")["segments"]
+    job.close()
 
-    job = Job(recognizer=Recognizer(), downloader=unavailable_download)
+    job = Job(
+        recognizer=Recognizer(), downloader=unavailable_download, title_resolver=lambda _: "Video"
+    )
     job.start("youtube", "https://youtu.be/example", {})
     assert (
         wait_for(job, lambda s: s["status"] == "error")["error"] == "YouTube-Audio nicht verfügbar."
     )
+    job.close()
 
 
 def test_silence_skipping_keeps_original_offsets_and_missing_model_is_actionable(tmp_path):
@@ -121,10 +130,12 @@ def test_silence_skipping_keeps_original_offsets_and_missing_model_is_actionable
     job.start("file", str(path), {})
     state = wait_for(job, lambda s: s["status"] == "completed")
     assert state["segments"][0]["start"] == 1
+    job.close()
 
     job = Job(recognizer=MissingModel())
     job.start("file", str(path), {})
     assert "Hugging Face" in wait_for(job, lambda s: s["status"] == "error")["error"]
+    job.close()
 
 
 def test_playlist_and_channel_urls_are_rejected_before_download():
@@ -135,6 +146,7 @@ def test_playlist_and_channel_urls_are_rejected_before_download():
         "https://www.youtube.com/watch?list=123",
     ):
         assert not job.start("youtube", url, {})["ok"]
+    job.close()
 
 
 class BlockedRecognizer(Recognizer):
@@ -170,6 +182,9 @@ def test_cancel_interrupts_stuck_model_and_allows_restart(tmp_path):
         time.sleep(0.01)
     assert job.snapshot()["status"] == "cancelled"
     assert time.monotonic() - started < 2
-    assert job.start("file", path, {})["ok"]
-    job.cancel()
+    restarted = job.start("file", path, {})
+    assert restarted["ok"]
+    job.select(restarted["id"])
+    job.cancel(restarted["id"])
     wait_for(job, lambda s: s["status"] == "cancelled")
+    job.close()

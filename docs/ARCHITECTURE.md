@@ -7,15 +7,34 @@ content or transcript injection via HTML. JS builds transcript nodes with
 `textContent`; model output is never executable markup. Tokens are entered in
 a password field, passed only to the worker, never returned in snapshots.
 
-`Job` owns a lightweight supervisor thread and a spawn worker process, with
-revisioned locked snapshots. Model/native calls and their GIL are isolated from
-the UI process. After a 0.5-second cancellation grace period, an unresponsive
-worker and its descendants are terminated. Process exit releases model RAM.
-Completed segments are immutable timeline values (`start`, `end`, `text`).
-A new job clears the prior result only after valid input and after the previous
-worker has stopped. The frontend polls snapshots every 400 ms; percentages
-refer to download bytes or processed decoded duration, depending on stage.
-No fabricated model-download percentage or token streaming is exposed.
+`Job` owns a locked FIFO and selection, a lightweight supervisor, and at most
+one spawned model worker. `worker.serve` keeps the sole recognizer alive across
+successive media tasks. Snapshots contain all row summaries and only the
+selected transcript. Selection never changes automatically when the queue
+advances. Tokens are private session options, absent from snapshots and logs.
+
+Pause is cooperative at safe media/segment boundaries. A versioned shared
+signal prevents rapid resume/pause transitions from losing acknowledgements;
+it has no process lock that a terminated worker could poison. The backend
+supervisor releases the worker after 300 seconds of confirmed pause, or of an
+unacknowledged request when a native call is stuck. Immediate release forces
+shutdown. Committed text and the exact decoded-audio cursor arrive atomically
+in one IPC message. The parent retains each paused task's temporary directory,
+completed decode flag and downloaded source, so a replacement worker can
+resume without duplicate committed segments or treating a partial decode as
+complete. Finishing the final chunk completes/releases an empty queue even if
+pause was requested. Runtime option changes on resume replace the worker.
+
+Cancellation has a 0.5-second grace period, then stops the worker and its
+FFmpeg/Node descendants before any successor. A per-video error advances FIFO;
+model-load prerequisites block/pause the queue and retain its work for retry.
+Empty queue and app close release the process and temporary work. Waiting media
+are never downloaded in advance. A separate single metadata thread resolves
+YouTube titles via bounded HTTPS oEmbed requests and certifi's CA bundle; late
+responses cannot restore removed rows. The frontend polls every 400 ms without
+overlap and uses keyed queue rows and incremental transcript nodes.
+Percentages represent download bytes or committed decoded duration; unknown
+stages have no fabricated percentage or completion estimate.
 
 `media.py` owns the external media/network boundary. FFmpeg runs without a
 shell, with argument arrays and disk-redirected streams. PCM is temporary and
@@ -48,6 +67,8 @@ bridge are exercised separately. See VERIFICATION.md for actual evidence.
 Operational logging is configured only at app startup and rotates in the user's
 local log directory. It records phases, timings, worker RSS and available memory,
 without URLs, file paths, transcript, tokens or arbitrary exception messages.
-`--worker-check` exercises frozen process spawning, IPC and forced cancellation.
+`--worker-check` exercises frozen spawning, FIFO, pause, release/resume,
+checkpoint continuity, selected transcripts and forced cancellation without
+model weights or a product fallback.
 The native entry point calls `multiprocessing.freeze_support()` before argument
 parsing or GUI initialization, including Windows resource-tracker invocations.

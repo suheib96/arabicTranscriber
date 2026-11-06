@@ -68,8 +68,9 @@ def self_check(destination):
 class _WorkerProbe:
     """Only used by the explicit package check; never a transcription fallback."""
 
-    def __init__(self, blocked=False):
+    def __init__(self, blocked=False, slow=False):
         self.blocked = blocked
+        self.slow = slow
 
     def load(self, options, cancel, stage):
         if self.blocked:
@@ -84,6 +85,10 @@ class _WorkerProbe:
                 ctypes.PyDLL(None).sleep(30)
 
     def transcribe(self, audio, cancel):
+        if self.slow:
+            import time
+
+            time.sleep(0.08)
         return "اختبار"
 
 
@@ -118,6 +123,26 @@ def worker_check(destination):
             state = wait(job, lambda s: s["status"] == "completed")
             assert len(state["segments"]) == 2
             report["spawn_and_segments"] = True
+            job.close()
+            job = Job(recognizer=_WorkerProbe(slow=True), segment_seconds=0.25)
+            first = job.start("file", str(path), {})
+            second = job.start("file", str(path), {})
+            assert first["ok"] and second["ok"]
+            wait(job, lambda s: len(s["segments"]) >= 1)
+            job.pause()
+            wait(job, lambda s: s["paused"] and not s["pausing"])
+            assert job.snapshot()["model_loaded"]
+            job.release_memory()
+            wait(job, lambda s: not s["worker_running"] and not s["releasing_memory"])
+            job.resume()
+            state = wait(job, lambda s: all(i["status"] == "completed" for i in s["items"]))
+            assert [segment["start"] for segment in state["segments"]] == [n / 4 for n in range(8)]
+            assert state["selected_id"] == first["id"]
+            job.select(second["id"])
+            assert len(job.snapshot()["segments"]) == 8
+            wait(job, lambda s: not s["worker_running"])
+            report["queue_pause_release_resume"] = True
+            job.close()
             job = Job(recognizer=_WorkerProbe(blocked=True))
             assert job.start("file", str(path), {})["ok"]
             wait(job, lambda s: s["stage"] == "Worker-Prüfung")
@@ -125,8 +150,10 @@ def worker_check(destination):
             job.cancel()
             wait(job, lambda s: s["status"] == "cancelled", timeout=2)
             report["cancel_seconds"] = round(time.monotonic() - started, 2)
-            assert job.start("file", str(path), {})["ok"]
-            job.cancel()
+            restarted = job.start("file", str(path), {})
+            assert restarted["ok"]
+            job.select(restarted["id"])
+            job.cancel(restarted["id"])
             wait(job, lambda s: s["status"] == "cancelled", timeout=2)
             report["restart"] = True
             report["ok"] = True
