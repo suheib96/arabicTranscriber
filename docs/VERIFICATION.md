@@ -1,3 +1,50 @@
+# Update 2026-11-06 — version 0.2.0 (local only)
+
+- Approved ImageGen queue design implemented with real HTML/CSS controls. The
+  subsequent approved scope adds global pause/resume and immediate memory
+  release, with a five-minute pause retention period.
+- Twenty-eight public behavior tests passed. Real spawned processes and FFmpeg
+  exercise serial FIFO, one model instance across queued tasks, separate selected
+  transcripts, progressive commits, cancellation, model-prerequisite retry,
+  metadata fallback/removal races, pause/resume, reload, final-chunk completion,
+  rapid repeated pause transitions and processing-time accounting after reload.
+- The automatic timeout was exercised with a short configured test interval,
+  with no UI/snapshot polls driving it. Default 300-second retention is checked
+  separately. A forced release/cancel interrupts a native PyDLL call that holds
+  the worker GIL; the successor verifies the old process has exited.
+- Source worker check passed FIFO, paused model retention, immediate release,
+  replacement worker, exact resumed audio offsets, selection and cancellation.
+  Source runtime check passed actual Cohere preprocessing, Node, FFmpeg decode,
+  model imports and TXT/DOCX/PDF export. These checks explicitly report
+  `real_model_inference: false` and are never a product transcription fallback.
+- Actual HTTPS YouTube oEmbed returned a real public title without media
+  download. Requests use a bounded response, socket timeout and certifi CA bundle.
+  One metadata thread is independent of the single heavy media pipeline.
+- Browser checks passed actual shipped document interactions: adding while
+  running, title escaping, selecting separate transcripts, pause countdown,
+  release/resume controls, stable Arabic text/selection, timestamp toggles,
+  760-pixel window overflow and non-overlapping slow snapshot calls. Idle,
+  running, paused, released and compact-window screenshots are in ignored scratch.
+- Ruff checks/formatting and `git diff --check` passed. No new dependencies or
+  alternative ASR model were introduced; app/package version is 0.2.0.
+
+Native macOS arm64 build `uv run python scripts/build.py` completed. The
+**frozen 0.2.0 executable** passed worker FIFO/pause/release/reload/resume and
+forced cancellation (0.55 s), real runtime/preprocessing/media/export self-check,
+and WKWebView window/bridge/font smoke. Hardware MPS availability was true in the
+native runtime; MPS inference itself remains unverified. Bundle version 0.2.0,
+post-smoke ad-hoc signature and independently read ZIP SHA256 passed. Archive
+inspection found no model weights, job media, scratch or signing key files.
+`dist/Arabic Transcriber.app` and `dist/release/ArabicTranscriber-macOS-arm64.zip`
+are the verified local outputs.
+No push, tag or new GitHub Release is part of this extension. The public download
+remains v0.1.2 until a separately authorized publication.
+
+Windows 0.2.0 execution and full original-checkpoint inference/quality/speed are
+not verified by these Mac checks. CPU Float32/RAM preflight remains unchanged;
+model reuse avoids repeated loads but no measured inference speedup is claimed.
+Developer-ID/notarization and Windows signing credentials remain unavailable.
+
 # Update 2026-11-05 — version 0.1.2
 
 - Reproduced the exact native picker failure with pywebview's real filter
