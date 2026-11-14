@@ -5,10 +5,11 @@ Minimalistische Desktop-App für lokale arabische Transkription mit
 Datei-/YouTube-Import, wachsendes RTL-Transkript, Fortschritt, Abbrechen,
 Alles kopieren sowie TXT, Word DOCX und PDF.
 
-Lokaler Entwicklungsstand **0.3.0**: YouTube-Playlists in die serielle
+Version **0.3.0**: YouTube-Playlists in die serielle
 Warteschlange importieren und alle vorhandenen Transkripte als ZIP mit Einzel-
-und gemeinsamer Datei exportieren. PDF ist vorausgewählt. Ein neues Paket beziehungsweise GitHub-Release ist ein separater
-Schritt; der vorhandene lokale App-Build wird dadurch nicht aktualisiert.
+und gemeinsamer Datei exportieren. PDF ist vorausgewählt.
+Installationspakete stehen unter [Releases](https://github.com/suheib96/arabicTranscriber/releases).
+Ein vorhandener lokaler App-Build wird durch Änderungen am Quellcode nicht aktualisiert.
 
 ## Lokal starten
 
@@ -250,17 +251,17 @@ Die FFmpeg-Lizenz-/Quellcodeanforderungen für öffentliche Weitergabe stehen in
 ## GitHub Builds und Releases aktivieren
 
 Repository: [suheib96/arabicTranscriber](https://github.com/suheib96/arabicTranscriber).
-[Version 0.1.2](https://github.com/suheib96/arabicTranscriber/releases/tag/v0.1.2)
-ist als Testversion mit Mac-ZIP, Windows-Setup, portablem Windows-ZIP und
-Prüfsummen verfügbar. Mac-/Windows-Builds und Paketprüfungen sind erfolgreich;
-echte Modellinferenz ist noch nicht verifiziert.
+Die [neueste veröffentlichte Version](https://github.com/suheib96/arabicTranscriber/releases/latest)
+enthält Mac-ZIP, Windows-Setup, portables Windows-ZIP und Prüfsummen.
+Die jeweiligen Plattform- und Modellprüfungen sind in `docs/VERIFICATION.md`
+dokumentiert; CI-Paketprüfungen verwenden keine echten Modellgewichte.
 
 Nach Versionsänderung, Commit und erfolgreichem `main`-Build einen neuen Tag
 pushen, beispielsweise für die nächste Version:
 
 ```sh
-git tag -a v0.1.3 -m "Arabic Transcriber 0.1.3"
-git push origin v0.1.3
+git tag -a v0.3.0 -m "Arabic Transcriber 0.3.0"
+git push origin v0.3.0
 ```
 
 `.github/workflows/build.yml` testet auf macOS 15 (Apple Silicon) und Windows Server 2025 x64, baut native Pakete und stellt

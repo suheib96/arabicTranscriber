@@ -222,7 +222,9 @@ def export_transcript(segments, destination, fmt, include_times=False):
     os.close(fd)
     try:
         if fmt == "txt":
-            Path(temporary).write_text(render_text(segments, include_times), encoding="utf-8")
+            Path(temporary).write_text(
+                render_text(segments, include_times), encoding="utf-8", newline="\n"
+            )
         elif fmt == "docx":
             _docx(segments, temporary, include_times)
         else:
@@ -298,7 +300,7 @@ def export_collection(entries, destination, fmt, include_times=False, *, title=N
                             render_text(entry["segments"], include_times),
                         ]
                     )
-                path.write_text("\n\n".join(content), encoding="utf-8")
+                path.write_text("\n\n".join(content), encoding="utf-8", newline="\n")
             elif fmt == "docx":
                 _docx([], path, include_times, entries=entries, title=title)
             else:

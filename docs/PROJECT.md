@@ -45,7 +45,9 @@ Count only nonempty results, visibly distinguish partial results before export
 and in the documents, and keep the native save destination selectable.
 Automatic permanent transcript storage was asked as an optional preference but
 has not been requested/selected; in-session retention remains the current rule.
-The user requested local Conventional Commits only for this extension.
+The extension was first kept in separate local Conventional Commits. The user
+subsequently authorized pushing main and, after successful Mac/Windows CI,
+creating/pushing the version tag to publish download packages.
 
 ## Model and runtime
 

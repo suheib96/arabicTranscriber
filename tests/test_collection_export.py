@@ -159,3 +159,31 @@ def test_failed_combined_archive_write_preserves_existing_export(tmp_path, monke
         )
     assert destination.read_bytes() == b"previous export"
     assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_txt_archive_has_the_same_utf8_line_endings_on_windows(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    original_open = Path.open
+
+    def windows_text_open(path, mode="r", *args, **kwargs):
+        if mode == "w" and kwargs.get("newline") is None:
+            kwargs["newline"] = "\r\n"
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", windows_text_open)
+    path = export_collection(
+        [
+            {
+                "title": "Video",
+                "status": "completed",
+                "segments": [{"start": 0, "end": 1, "text": "مرحبا\nBerlin"}],
+            }
+        ],
+        tmp_path / "windows.zip",
+        "txt",
+        True,
+    )
+    with zipfile.ZipFile(path) as archive:
+        assert len(archive.namelist()) == 2
+        assert all(b"\r" not in archive.read(name) for name in archive.namelist())

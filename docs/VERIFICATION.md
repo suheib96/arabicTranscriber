@@ -1,5 +1,16 @@
 # Update 2026-11-14 — version 0.3.0 (local source only)
 
+Release validation, authorized subsequently by the user: initial main run
+[43622814104](https://github.com/suheib96/arabicTranscriber/actions/runs/43622814104)
+passed macOS but exposed Windows TXT newline differences and a cancellation
+race. TXT now writes explicit UTF-8/LF on both platforms. Cancellation signals
+the worker immediately and rejects checkpoints received after the cancel
+request, retaining the already committed transcript. A transport-held external
+ASR fixture reproduced the race locally before the fix; a simulated Windows
+text-file boundary reproduced the newline mismatch. Both regressions now pass;
+all 42 local pytest checks and Ruff lint/format pass.
+Remote packaging must pass on the corrected commit before tagging v0.3.0.
+
 Second local change: collected exports now include the individual files **and
 one combined TXT/DOCX/PDF document**. PDF is the UI default. Common playlist
 provenance determines the proposed ZIP/combined filename; mixed/manual queues

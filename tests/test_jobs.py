@@ -80,6 +80,51 @@ def test_cancel_retains_completed_segments_and_new_job_can_start(tmp_path):
     job.close()
 
 
+class InFlightText(str):
+    def __new__(cls, text, entered, release):
+        value = super().__new__(cls, text)
+        value.entered, value.release = entered, release
+        return value
+
+    def strip(self):
+        return self
+
+    def __reduce__(self):
+        # Hold external result transport after inference, before the parent receives it.
+        self.entered.set()
+        self.release.wait(5)
+        return str, (str(self),)
+
+
+class InFlightRecognizer(Recognizer):
+    def __init__(self, entered, release):
+        self.entered, self.release, self.calls = entered, release, 0
+
+    def transcribe(self, audio, cancel):
+        self.calls += 1
+        if self.calls == 2:
+            return InFlightText("نص متأخر", self.entered, self.release)
+        return "نص محفوظ"
+
+
+def test_cancel_ignores_checkpoint_already_in_flight(tmp_path):
+
+    context = get_context("spawn")
+    entered, release = context.Event(), context.Event()
+    job = Job(recognizer=InFlightRecognizer(entered, release), segment_seconds=1)
+    try:
+        assert job.start("file", str(audio_file(tmp_path)), {})["ok"]
+        assert entered.wait(5)
+        wait_for(job, lambda s: len(s["segments"]) == 1)
+        job.cancel()
+        release.set()
+        state = wait_for(job, lambda s: s["status"] == "cancelled")
+        assert [s["text"] for s in state["segments"]] == ["نص محفوظ"]
+    finally:
+        release.set()
+        job.close()
+
+
 class DownloadedAudio:
     def __init__(self, path):
         self.path = path

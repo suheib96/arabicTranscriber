@@ -350,6 +350,8 @@ class Job:
                 if item["id"] == self._active:
                     item.update(status="cancelling", stage="Abbrechen")
                     self._cancel_at = time.monotonic()
+                    if self._cancel:
+                        self._cancel.set()
                 else:
                     item.update(
                         status="cancelled",
@@ -521,7 +523,7 @@ class Job:
                         elapsed_s=round(time.monotonic() - item["started"], 2),
                     )
                 item.update(stage=message["stage"], progress=message["progress"])
-            elif kind == "checkpoint":
+            elif kind == "checkpoint" and not self._cancel_at:
                 if message["text"]:
                     item["segments"].append({key: message[key] for key in ("start", "end", "text")})
                 item.update(offset=message["end"], progress=message["end"] / message["total"])
