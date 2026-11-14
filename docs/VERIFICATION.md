@@ -1,4 +1,43 @@
-# Update 2026-11-14 — version 0.3.0 (local source only)
+# Release 2026-11-14 — version 0.3.0
+
+The user authorized pushing main, followed by a version tag only after complete
+platform CI success. Corrected commit `d825fc3` passed both platform test/UI
+jobs and both package jobs in
+[main run 43623455617](https://github.com/suheib96/arabicTranscriber/actions/runs/43623455617).
+Annotated tag `v0.3.0` points to that exact commit. Its independent
+[release run 43624676960](https://github.com/suheib96/arabicTranscriber/actions/runs/43624676960)
+passed all five jobs and published
+[Release 0.3.0](https://github.com/suheib96/arabicTranscriber/releases/tag/v0.3.0)
+as the latest full release, with Mac arm64 ZIP, Windows amd64 portable ZIP,
+Windows x64 Setup EXE and three SHA256 manifests. All three manifests match
+GitHub's independently calculated upload digests. Release notes include the
+new behavior, installation choices and session-only result retention.
+
+Both release OS test jobs passed 42 pytest checks and browser smoke. The actual
+frozen apps passed native window/bridge/font smoke, real Cohere preprocessing,
+Node/FFmpeg and collection export checks. Frozen worker checks passed spawned
+serial processing, playlist-to-queue, pause/release/resume and cancellation;
+forced cancellation was 0.64 s on Mac and 0.53 s on Windows. All four downloaded
+runtime/worker reports say `ok: true` and `real_model_inference: false`.
+Windows runtime is PyTorch `2.15.0+cpu`, with no CUDA. MPS inference remains
+unverified. Windows installer compilation and Microsoft's WebView2 signature
+check passed; interactive installation on a recipient's hardware remains a
+manual check. Real original-checkpoint inference/quality/speed is not established
+by these CI tests.
+
+Signing logs confirm ad-hoc macOS signature without Developer ID/notarization,
+and unsigned Windows executable/installer. Apple Developer-ID/notary and
+Windows Authenticode credentials are still needed for credential-backed signing.
+No multi-gigabyte packages were downloaded locally under current disk pressure;
+the existing local `dist/Arabic Transcriber.app` remains 0.2.0.
+
+Local source start: `uv run arabic-transcriber`. Packaging commands remain
+`uv run python scripts/build.py` on Mac and
+`.\scripts\build_windows_setup.ps1` on Windows (uv and Inno Setup 6 required).
+The corresponding PyInstaller/media/archive pipelines were verified on GitHub;
+a fresh local 0.3.0 build was not run. Historical local-only findings follow.
+
+# Development 2026-11-14 — version 0.3.0 (before publication)
 
 Release validation, authorized subsequently by the user: initial main run
 [43622814104](https://github.com/suheib96/arabicTranscriber/actions/runs/43622814104)
