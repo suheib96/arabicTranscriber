@@ -29,7 +29,7 @@ function renderTranscript(segments) {
   renderedSegments = segments.slice(); renderedTimes = times;
   if (added && atBottom) area.scrollTop = area.scrollHeight;
 }
-let controlPending = false;
+let controlPending = false, exporting = false;
 const queueRows = new Map();
 const options = () => ({token: $('token').value, offline: $('offline').checked, device: $('device').value});
 const pendingItem = item => ['queued', 'running', 'paused', 'cancelling'].includes(item.status);
@@ -76,15 +76,43 @@ function renderQueue(items) {
     row.action.onclick = () => act(cancellable ? 'cancel' : 'remove', item.id);
   }
 }
+function playlistInput() {
+  if (source !== 'youtube') return false;
+  try { const url = new URL($('url').value); return url.protocol === 'https:' && ['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(url.hostname) && url.pathname === '/playlist' && !!url.searchParams.get('list'); }
+  catch(e) { return false; }
+}
+function updateSubmit() {
+  const importing = ['pending','loading','cancelling'].includes((snapshot.playlist_import || {}).status);
+  $('startLabel').textContent = playlistInput() ? 'Playlist hinzufügen' : 'Transkribieren';
+  $('start').disabled = controlPending || (importing && playlistInput());
+}
+function renderImport() {
+  const state = snapshot.playlist_import || {status:'idle'};
+  const busy = ['pending','loading','cancelling'].includes(state.status);
+  $('playlistNotice').hidden = state.status === 'idle';
+  $('playlistTitle').textContent = state.title || '';
+  $('playlistTitle').hidden = !state.title;
+  let message = '';
+  if (busy) message = state.status === 'cancelling' ? 'Import wird abgebrochen …' : `Playlist wird eingelesen …${state.found ? ` · ${state.found} Videos gefunden` : ''}`;
+  else if (state.status === 'completed') message = `${state.added} ${state.added === 1 ? 'Video' : 'Videos'} hinzugefügt${state.duplicates ? ` · ${state.duplicates} bereits vorhanden` : ''}${state.skipped ? ` · ${state.skipped} nicht verfügbar` : ''}`;
+  else if (state.status === 'cancelled') message = 'Playlist-Import abgebrochen';
+  else if (state.status === 'error') message = state.error;
+  $('playlistState').textContent = message;
+  $('playlistNotice').classList.toggle('import-error', state.status === 'error');
+  $('cancelImport').hidden = !busy;
+  $('cancelImport').disabled = controlPending || state.status === 'cancelling';
+  return busy;
+}
 function render() {
   const items = snapshot.items || [], segments = snapshot.segments || [];
-  const pending = items.filter(pendingItem), busy = pending.length > 0;
+  const importing = renderImport();
+  const pending = items.filter(pendingItem), busy = pending.length > 0 || importing;
   const message = localError || snapshot.queue_error || snapshot.error || '';
   $('error').hidden = !message; $('error').textContent = message;
   $('queueCard').hidden = !items.length;
   renderQueue(items);
   const waiting = items.filter(i => i.status === 'queued').length;
-  $('queueSummary').textContent = snapshot.paused ? `Pausiert · ${pending.length} offen` : snapshot.active_id ? `1 läuft${waiting ? ` · ${waiting} warten` : ''}` : waiting ? `${waiting} ${waiting === 1 ? 'wartet' : 'warten'}` : 'Abgeschlossen';
+  $('queueSummary').textContent = snapshot.paused ? `Pausiert · ${pending.length} offen` : snapshot.active_id ? `1 läuft${waiting ? ` · ${waiting} ${waiting === 1 ? 'wartet' : 'warten'}` : ''}` : waiting ? `${waiting} ${waiting === 1 ? 'wartet' : 'warten'}` : 'Abgeschlossen';
   $('pause').hidden = !busy && !snapshot.paused;
   $('pause').textContent = snapshot.paused ? 'Fortsetzen' : 'Pause';
   $('pause').classList.toggle('resume', !!snapshot.paused);
@@ -94,9 +122,13 @@ function render() {
   const active = items.find(item => item.id === snapshot.active_id);
   $('memoryState').textContent = snapshot.releasing_memory ? 'Speicher wird freigegeben …' : snapshot.model_loaded ? `Modell im RAM${snapshot.paused && snapshot.release_in_seconds != null ? ` · Freigabe in ${timeLabel(snapshot.release_in_seconds)}` : ''}` : active && (active.stage || '').startsWith('Modell') ? 'Modell wird geladen …' : 'Modell entladen';
   $('queueState').textContent = snapshot.pausing ? 'Pause angefordert …' : '';
-  $('start').disabled = controlPending;
+  updateSubmit();
   ['token', 'device', 'offline'].forEach(id => $(id).disabled = busy && !snapshot.paused);
-  $('copy').disabled = $('export').disabled = !segments.length;
+  $('copy').disabled = !segments.length; $('export').disabled = exporting || !segments.length;
+  const exportCount = items.filter(item => item.has_transcript).length;
+  $('exportAll').disabled = exporting || !exportCount;
+  $('exportAll').textContent = `Alle exportieren${exportCount ? ` · ${exportCount}` : ''}`;
+  $('format').disabled = exporting;
   $('empty').hidden = segments.length > 0; $('segmentCount').textContent = segments.length || '';
   const selected = items.find(item => item.id === snapshot.selected_id);
   $('transcriptTitle').textContent = selected ? selected.title : '';
@@ -107,6 +139,7 @@ function feedback(text) { localError = ''; $('error').hidden = !snapshot.error; 
 function selectSource(value) {
   source = value; $('choose').hidden = value !== 'file'; $('urlLabel').hidden = value !== 'youtube';
   for (const v of ['file', 'youtube']) { $(v + 'Tab').classList.toggle('selected', v === value); $(v + 'Tab').setAttribute('aria-pressed', String(v === value)); }
+  updateSubmit();
 }
 async function refresh() { snapshot = await pywebview.api.snapshot(); render(); }
 async function act(method, argument) {
@@ -116,6 +149,8 @@ async function act(method, argument) {
   catch(e) { error(e); }
   finally { controlPending = false; render(); }
 }
+$('url').oninput = updateSubmit;
+$('cancelImport').onclick = () => act('cancel_playlist_import');
 $('fileTab').onclick = () => selectSource('file'); $('youtubeTab').onclick = () => selectSource('youtube');
 $('settingsButton').onclick = () => {
   $('settings').hidden = !$('settings').hidden;
@@ -127,14 +162,15 @@ $('choose').onclick = async () => {
 };
 $('start').onclick = async () => {
   if (controlPending) return;
+  const submittedSource = source, submittedValue = source === 'file' ? selectedFile : $('url').value;
   controlPending = true; render();
   try {
-    const result = await pywebview.api.start(source, source === 'file' ? selectedFile : $('url').value, options());
+    const result = await pywebview.api.start(submittedSource, submittedValue, options());
     if (!result.ok) error(result.error);
     else {
       localError = ''; $('token').value = '';
-      if (source === 'youtube') $('url').value = '';
-      else { selectedFile = ''; $('filename').textContent = 'Audio oder Video auswählen'; }
+      if (submittedSource === 'youtube' && $('url').value === submittedValue) $('url').value = '';
+      else if (submittedSource === 'file' && selectedFile === submittedValue) { selectedFile = ''; $('filename').textContent = 'Audio oder Video auswählen'; }
       await refresh();
     }
   } catch(e) { error(e); }
@@ -144,7 +180,17 @@ $('pause').onclick = () => { const paused = snapshot.paused; const settings = op
 $('releaseMemory').onclick = () => act('release_memory');
 $('times').onchange = render;
 $('copy').onclick = async () => { try { const r = await pywebview.api.copy_all($('outputTimes').checked); if (!r.ok) error(r.error); else feedback('Kopiert'); } catch(e) { error(e); } };
-$('export').onclick = async () => { try { const r = await pywebview.api.export($('format').value, $('outputTimes').checked); if (r.error) error(r.error); else if (r.path) feedback('Gespeichert'); } catch(e) { error(e); } };
+async function exportResults(all) {
+  if (exporting) return;
+  const format = $('format').value, times = $('outputTimes').checked;
+  exporting = true; render();
+  try { const r = await pywebview.api[all ? 'export_all' : 'export'](format, times); if (r.error) error(r.error); else if (r.path) feedback(all ? `${r.count} ${r.count === 1 ? 'Transkript' : 'Transkripte'} gespeichert` : 'Gespeichert'); }
+  catch(e) { error(e); }
+  finally { exporting = false; render(); }
+}
+$('export').onclick = () => exportResults(false);
+$('exportAll').onclick = () => exportResults(true);
+
 async function poll() {
   if (!polling) return;
   try { const next = await pywebview.api.snapshot(); if (next.error && next.error !== snapshot.error) localError = ''; snapshot = next; render(); }
@@ -165,7 +211,7 @@ window.addEventListener('beforeunload', () => polling = false);
 window.desktopSmoke = async () => {
   await document.fonts.ready;
   const state = await pywebview.api.snapshot();
-  return {title: document.title, bridge: state.status === 'idle', buttons: !!$('start') && !!$('export') && !!$('pause') && !!$('releaseMemory'),
+  return {title: document.title, bridge: state.status === 'idle', buttons: !!$('start') && !!$('export') && !!$('pause') && !!$('releaseMemory') && !!$('exportAll') && !!$('playlistNotice'),
     rtl: $('transcript').dir, font: document.fonts.check('21px NotoArabic'), bodyWidth: document.body.scrollWidth, viewport: innerWidth};
 };
 render();

@@ -75,6 +75,28 @@ require('fs').mkdirSync('.scratch/arabic-transcriber', {recursive:true});
  if(await page.locator('.queue-row').count()!==2)throw Error('queued removal failed');
  await page.locator('#times').uncheck();
  if(await page.locator('.segment time').count())throw Error('timestamp toggle failed');
+ // Playlist import and collected export use the real DOM and a network-boundary fake.
+ await page.evaluate(()=>{
+   window.fixture.items[0].has_transcript=true;
+   window.pywebview.api.start=async(source,value)=>{window.fixture.playlist_import={status:'loading',found:3};return {ok:true,importing:true};};
+   window.pywebview.api.cancel_playlist_import=async()=>{window.fixture.playlist_import.status='cancelled';return {ok:true};};
+   window.pywebview.api.export_all=async(fmt,times)=>{window.collectionArgs=[fmt,times];return {path:'/tmp/collection.zip',count:1};};
+   snapshot=window.fixture;render();
+ });
+ if(!await page.locator('#exportAll').count())throw Error('collected export control missing');
+ if(!await page.locator('#exportAll').isEnabled())throw Error('collected export disabled with transcript');
+ await page.locator('#format').selectOption('docx');
+ await page.locator('#outputTimes').check();
+ await page.locator('#exportAll').click();
+ if(JSON.stringify(await page.evaluate(()=>window.collectionArgs))!==JSON.stringify(['docx',true]))throw Error('collection lost format/timestamp options');
+ await page.locator('#url').fill('https://www.youtube.com/playlist?list=PL_example');
+ if(!(await page.locator('#start').textContent()).includes('Playlist'))throw Error('playlist input not recognized');
+ await page.locator('#start').click();
+ if(!await page.locator('#playlistNotice').isVisible())throw Error('playlist progress hidden');
+ await page.locator('#cancelImport').click();
+ await page.evaluate(()=>{window.fixture.playlist_import={status:'completed',title:'دروس · TESTFIXTUR',added:2,duplicates:1,skipped:1};snapshot=window.fixture;render();});
+ if(!(await page.locator('#playlistNotice').textContent()).includes('2 Videos'))throw Error('import result count missing');
+ await page.screenshot({path:'.scratch/arabic-transcriber/ui-playlist-completed.png',fullPage:true});
  await page.setViewportSize({width:760,height:600});
  if(await page.evaluate(()=>document.body.scrollWidth>innerWidth))throw Error('compact window overflows horizontally');
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-queue-compact.png',fullPage:true});

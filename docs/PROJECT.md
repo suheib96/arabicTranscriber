@@ -28,6 +28,16 @@ Immediate release stops even an unresponsive worker. Resume reloads as needed
 and continues from the last complete checkpoint. Reuse the model across
 successive queued tasks, release it when no unfinished task remains or on close.
 The initial queue is in-session; persistence across app restarts is separate.
+Public YouTube playlist URLs may be read as metadata, then expanded into titled
+individual tasks in playlist order. Import stays asynchronous/cancellable and
+never downloads playback media. Deduplicate IDs inside an import and against
+existing queued/running/completed YouTube tasks. Keep the actual media downloader
+restricted to individual videos. Unavailable entries/errors must be visible in
+import counts or per-item failures without creating a second ASR pipeline.
+Offer a manual collected export: one ZIP, individual safely named TXT/DOCX/PDF
+files per available transcript, preserving the existing timestamp option.
+Automatic permanent transcript storage was asked as an optional preference but
+has not been requested/selected; in-session retention remains the current rule.
 The user requested local Conventional Commits only for this extension.
 
 ## Model and runtime

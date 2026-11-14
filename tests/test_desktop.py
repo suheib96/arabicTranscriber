@@ -93,3 +93,60 @@ def test_desktop_exposes_queue_selection_pause_and_memory_controls(tmp_path):
         assert api.resume()["ok"]
     finally:
         api.close()
+
+
+def test_desktop_playlist_link_is_imported_into_paused_queue():
+    import time
+
+    from arabic_transcriber.jobs import Job
+
+    def read(url, cancel, report):
+        return {"title": "قائمة", "entries": [{"url": "https://youtu.be/one", "title": "الدرس"}]}
+
+    api = DesktopAPI(job=Job(playlist_reader=read))
+    try:
+        api.pause()
+        result = api.start("youtube", "https://www.youtube.com/playlist?list=PL_example", {})
+        assert result["ok"] and result["importing"]
+        deadline = time.monotonic() + 2
+        while (
+            time.monotonic() < deadline
+            and api.snapshot()["playlist_import"]["status"] != "completed"
+        ):
+            time.sleep(0.01)
+        assert api.snapshot()["items"][0]["title"] == "الدرس"
+    finally:
+        api.close()
+
+
+def test_desktop_collection_export_uses_native_save_and_all_results(tmp_path):
+    import zipfile
+
+    class Results:
+        def export_entries(self):
+            return [
+                {
+                    "title": "واحد",
+                    "status": "completed",
+                    "segments": [{"start": 0, "end": 12, "text": "نص أول"}],
+                },
+                {
+                    "title": "اثنان",
+                    "status": "completed",
+                    "segments": [{"start": 12, "end": 24, "text": "نص ثان"}],
+                },
+            ]
+
+    class Window:
+        def create_file_dialog(self, *args, **kwargs):
+            return str(tmp_path / "all.zip")
+
+    api = DesktopAPI(job=Results())
+    api.window = Window()
+    result = api.export_all("txt", False)
+    assert result["count"] == 2
+    with zipfile.ZipFile(result["path"]) as archive:
+        assert [archive.read(name).decode("utf-8") for name in archive.namelist()] == [
+            "نص أول",
+            "نص ثان",
+        ]

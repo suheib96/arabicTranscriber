@@ -1,8 +1,10 @@
 """One transcript representation for clipboard, UTF-8 and shaped RTL documents."""
 
 import os
+import re
 import tempfile
 import uuid
+import zipfile
 from pathlib import Path
 
 FONT = Path(__file__).parent / "fonts" / "NotoSansArabic.ttf"
@@ -148,6 +150,41 @@ def export_transcript(segments, destination, fmt, include_times=False):
             _docx(segments, temporary, include_times)
         else:
             _pdf(segments, temporary, include_times)
+        os.replace(temporary, destination)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return destination
+
+
+def export_collection(entries, destination, fmt, include_times=False):
+    """One atomic ZIP, one safely named document per nonempty transcript."""
+    if fmt not in ("txt", "docx", "pdf"):
+        raise ValueError("Exportformat nicht unterstützt.")
+    entries = [entry for entry in entries if entry.get("segments")]
+    if not entries:
+        raise ValueError("Noch kein Transkript vorhanden.")
+    destination = Path(destination).with_suffix(".zip")
+    fd, temporary = tempfile.mkstemp(suffix=".zip", dir=destination.parent)
+    os.close(fd)
+    try:
+        with (
+            tempfile.TemporaryDirectory(prefix="arabic-export-") as directory,
+            zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive,
+        ):
+            width = max(3, len(str(len(entries))))
+            for number, entry in enumerate(entries, 1):
+                title = re.sub(
+                    r'[\\/\x00-\x1f<>:"|?*\u202a-\u202e\u2066-\u2069]',
+                    "_",
+                    str(entry.get("title") or "Transkript"),
+                )
+                title = title.strip(" .")[:100] or "Transkript"
+                partial = " - Teiltranskript" if entry.get("status") != "completed" else ""
+                name = f"{number:0{width}d} - {title}{partial}.{fmt}"
+                path = export_transcript(
+                    entry["segments"], Path(directory) / name, fmt, include_times
+                )
+                archive.write(path, arcname=name)
         os.replace(temporary, destination)
     finally:
         Path(temporary).unlink(missing_ok=True)

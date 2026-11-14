@@ -72,3 +72,22 @@ checkpoint continuity, selected transcripts and forced cancellation without
 model weights or a product fallback.
 The native entry point calls `multiprocessing.freeze_support()` before argument
 parsing or GUI initialization, including Windows resource-tracker invocations.
+
+
+`playlists.py` normalizes explicit playlist URLs and enumerates yt-dlp flat
+metadata with playback download disabled. `Job.import_playlist` submits a short
+request; the existing metadata thread resolves it, checks cancellation/close,
+and appends titled tasks atomically in relative playlist order. Video IDs are
+normalized for deduplication. Completed request cleanup cannot clear options of
+a newly accepted import. Access tokens are private import/session options and
+are never sent to the metadata reader, snapshots or archive exports. Only
+individual video URLs reach the media worker. Playlist import can be cancelled
+independently of a currently running transcription.
+
+`Job.export_entries` returns a consistent copy of nonempty per-item results.
+`exports.export_collection` writes each existing export format sequentially
+into a temporary ZIP and atomically replaces the selected destination only
+when successful. Numbered sanitized basenames preserve Unicode titles without
+path separators or filename collisions. Partial results are explicitly named.
+Transcript content is not automatically persisted, and no ZIP is created until
+the user exports. The session store remains memory-only.

@@ -44,13 +44,20 @@ class DesktopAPI:
         return result[0] if result else None
 
     def start(self, source, value, options=None):
+        from .playlists import playlist_url
+
         if source == "file" and not Path(value).is_file():
             return {"ok": False, "error": "Datei nicht gefunden. Bitte Audio oder Video auswählen."}
         if self.job is None:
             from .jobs import Job
 
             self.job = Job()
+        if source == "youtube" and playlist_url(value):
+            return self.job.import_playlist(value, options or {})
         return self.job.start(source, value, options or {})
+
+    def cancel_playlist_import(self):
+        return self.job.cancel_playlist_import() if self.job else {"ok": True}
 
     def pause(self):
         if self.job is None:
@@ -132,3 +139,29 @@ class DesktopAPI:
             return {"path": str(export_transcript(segments, destination, fmt, bool(include_times)))}
         except Exception:
             return {"error": "Export fehlgeschlagen. Schreibrechte und freien Speicher prüfen."}
+
+    def export_all(self, fmt, include_times=False):
+        import webview
+
+        from .exports import export_collection
+
+        if fmt not in ("txt", "docx", "pdf"):
+            return {"error": "Unbekanntes Exportformat."}
+        entries = self.job.export_entries() if self.job else []
+        if not entries:
+            return {"error": "Noch kein Transkript vorhanden."}
+        chosen = self.window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename="Transkripte.zip", file_types=("ZIP (*.zip)",)
+        )
+        if not chosen:
+            return {"path": None}
+        destination = chosen[0] if isinstance(chosen, (tuple, list)) else chosen
+        try:
+            return {
+                "path": str(export_collection(entries, destination, fmt, bool(include_times))),
+                "count": len(entries),
+            }
+        except Exception:
+            return {
+                "error": "Sammelexport fehlgeschlagen. Schreibrechte und freien Speicher prüfen."
+            }

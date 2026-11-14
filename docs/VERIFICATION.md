@@ -1,3 +1,40 @@
+# Update 2026-11-14 — version 0.3.0 (local source only)
+
+- Public playlist URLs now import titles and video IDs in order through a
+  metadata-only background reader. Duplicate and unavailable entries are
+  skipped, cancellation discards late results, and the existing heavy media
+  pipeline still runs exactly one video at a time.
+- The user's real public playlist `PLED4Dj-T43rPGtWFCIebU56RDUY_-Zxwf`
+  returned **11 titled videos**. Importing into a paused real Job added all 11
+  in order, with zero duplicates/skips and no media worker, audio download or
+  model-weight download.
+- Thirty-six pytest tests passed, including asynchronous import, deduplication,
+  cancellation/close races, the DesktopAPI boundary and collected export.
+  Actual TXT, DOCX and PDF exporters produced separate documents inside ZIPs;
+  filenames preserve titles while preventing archive paths and collisions.
+- Browser checks passed playlist recognition, import progress/cancellation,
+  collected export options, existing queue/pause/selection behavior and compact
+  window layout. Native source WKWebView smoke passed bridge, controls, RTL,
+  font and window-width checks.
+- Source runtime self-check passed actual Cohere preprocessing, FFmpeg, Node
+  and collection exports. Source spawned-worker check passed playlist-to-serial
+  queue, pause/release/resume and forced cancellation (0.57 seconds). Both
+  explicitly report `real_model_inference: false`.
+- Ruff lint/format and `git diff --check` passed. Dependencies and ASR model are
+  unchanged. Results remain session-only; single and collected exports are
+  manual, with no automatic transcript persistence after closing the app.
+
+Start this source version with `uv run arabic-transcriber`. The existing
+`dist/Arabic Transcriber.app` is still **0.2.0**. With approximately 1 GiB free
+disk space, a new frozen 0.3.0 build was deliberately not attempted and the
+existing package was preserved. The packaging commands remain
+`uv run python scripts/build.py` on macOS and
+`.\scripts\build_windows_setup.ps1` on Windows (uv and Inno Setup 6 required).
+These new 0.3.0 packages, Windows execution and full original-checkpoint
+inference/quality/speed remain unverified. Developer-ID/notarization and Windows
+signing credentials remain unavailable. No push, tag or release is part of
+this local change; GitHub Actions can package it after a separate push.
+
 # Update 2026-11-06 — version 0.2.0 (local only)
 
 - Approved ImageGen queue design implemented with real HTML/CSS controls. The

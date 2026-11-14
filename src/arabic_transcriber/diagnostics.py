@@ -21,7 +21,7 @@ def self_check(destination):
             CohereAsrProcessor,
         )
 
-        from .exports import export_transcript
+        from .exports import export_collection, export_transcript
         from .media import audio_segments, decode, tool
 
         report.update(
@@ -57,6 +57,24 @@ def self_check(destination):
                     True,
                 )
                 assert exported.stat().st_size > 20
+                import zipfile
+
+                collection = export_collection(
+                    [
+                        {
+                            "title": "اختبار",
+                            "status": "completed",
+                            "segments": [{"start": 0, "end": 1, "text": "مرحبا Berlin 2026"}],
+                        }
+                    ],
+                    directory / ("collection-" + fmt + ".zip"),
+                    fmt,
+                    True,
+                )
+                with zipfile.ZipFile(collection) as archive:
+                    assert len(archive.namelist()) == 1
+                    assert archive.namelist()[0].endswith("." + fmt)
+            report["collection_exports"] = True
         report["ok"] = True
     except Exception as error:
         report["error"] = type(error).__name__ + ": " + str(error)
@@ -90,6 +108,26 @@ class _WorkerProbe:
 
             time.sleep(0.08)
         return "اختبار"
+
+
+class _FixtureDownload:
+    """Explicit check fixture, never used by the product downloader."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def __call__(self, url, directory, cancel, report):
+        return Path(self.path)
+
+
+def _playlist_probe(url, cancel, report):
+    return {
+        "title": "اختبار",
+        "entries": [
+            {"url": "https://youtu.be/probe-a", "title": "اختبار 1"},
+            {"url": "https://youtu.be/probe-b", "title": "اختبار 2"},
+        ],
+    }
 
 
 def worker_check(destination):
@@ -142,6 +180,20 @@ def worker_check(destination):
             assert len(job.snapshot()["segments"]) == 8
             wait(job, lambda s: not s["worker_running"])
             report["queue_pause_release_resume"] = True
+            job.close()
+            job = Job(
+                recognizer=_WorkerProbe(),
+                downloader=_FixtureDownload(str(path)),
+                playlist_reader=_playlist_probe,
+            )
+            job.pause()
+            assert job.import_playlist("https://www.youtube.com/playlist?list=PL_probe")["ok"]
+            state = wait(job, lambda s: s["playlist_import"]["status"] == "completed")
+            assert state["playlist_import"]["added"] == 2 and not state["worker_running"]
+            job.resume()
+            wait(job, lambda s: all(i["status"] == "completed" for i in s["items"]))
+            assert len(job.export_entries()) == 2
+            report["playlist_to_serial_queue"] = True
             job.close()
             job = Job(recognizer=_WorkerProbe(blocked=True))
             assert job.start("file", str(path), {})["ok"]

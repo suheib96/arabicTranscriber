@@ -5,10 +5,10 @@ Minimalistische Desktop-App für lokale arabische Transkription mit
 Datei-/YouTube-Import, wachsendes RTL-Transkript, Fortschritt, Abbrechen,
 Alles kopieren sowie TXT, Word DOCX und PDF.
 
-Lokaler Entwicklungsstand **0.2.0**: serielle Warteschlange mit YouTube-Titeln,
-Pause/Fortsetzen und Modellwiederverwendung. Der veröffentlichte Release 0.1.2
-enthält diese Erweiterung noch nicht. Neue Änderungen sind lokal committet;
-ein Push oder Release von 0.2.0 erfolgt separat.
+Lokaler Entwicklungsstand **0.3.0**: YouTube-Playlists in die serielle
+Warteschlange importieren und alle vorhandenen Transkripte gesammelt als ZIP
+exportieren. Ein neues Paket beziehungsweise GitHub-Release ist ein separater
+Schritt; der vorhandene lokale App-Build wird dadurch nicht aktualisiert.
 
 ## Lokal starten
 
@@ -59,10 +59,19 @@ Cloud-Transkription. Gated Zugang, Speicher und Hardware sind reale Voraussetzun
 
 ## Bedienung und Grenzen
 
-Datei wählen oder einen HTTPS-Link zu einem einzelnen YouTube-Video einfügen.
+Datei wählen oder einen HTTPS-Link zu einem YouTube-Video einfügen.
+Ein öffentlicher Playlist-Link (`https://www.youtube.com/playlist?list=…`)
+ändert die Aktion zu „Playlist hinzufügen“. Die App liest zunächst Titel und
+Einträge ein und übernimmt verfügbare Videos in Playlist-Reihenfolge. Doppelte
+Video-IDs innerhalb des Imports und bereits wartende/laufende/fertige Videos
+werden übersprungen. Private, gelöschte und als live markierte Einträge werden
+soweit aus den Metadaten erkennbar ausgelassen; weitere Medienfehler erscheinen
+am jeweiligen Auftrag. Der Import ist abbrechbar. Er lädt weder Audio noch
+Modellgewichte. Video-Links mit `watch?v=…&list=…` bleiben Einzelvideos; für die
+ganze Liste den eigentlichen `/playlist?list=…`-Link verwenden.
 YouTube lädt bevorzugt Audio und verwendet denselben lokalen Modellpfad.
 Private, geografisch gesperrte, geschützte oder von YouTube blockierte Videos
-können scheitern. Livestreams und Playlists werden nicht verarbeitet.
+können scheitern. Livestreams werden nicht transkribiert. Playlist-Einträge verwenden nach dem Import denselben seriellen Medienpfad.
 Vorbereitung, YouTube-Download, Modellladen und Transkription haben getrennte
 Statusanzeigen. Nur messbare Stadien zeigen einen Prozentsatz.
 
@@ -79,7 +88,15 @@ Für lange Medien ausreichend temporären Plattenplatz einplanen (PCM ca. 115 MB
 „Zeiten“ zeigt **ungefähre Audioabschnittszeiten**, keine nativen Cohere-Wortzeiten.
 „Zeiten in Kopie / Export“ steuert unabhängig davon alle Ausgabeformate.
 Umschalten verändert weder Text noch Modelllauf. DOCX ist das aktuelle
-Word-Format; es werden keine DOCX-Dateien als `.doc` ausgegeben. Die App bettet
+Word-Format; es werden keine DOCX-Dateien als `.doc` ausgegeben.
+„Alle exportieren“ erstellt ein ZIP mit einer eigenen Datei pro vorhandenem
+Transkript, im gewählten Format und mit der gemeinsamen Zeitangaben-Einstellung.
+Dateinamen enthalten eine laufende Nummer und den Videotitel; vorhandene
+Teilergebnisse sind als „Teiltranskript“ gekennzeichnet. Leere Ergebnisse werden
+nicht exportiert. Die Dateien werden lokal am gewählten Speicherort angelegt.
+Einzel- und Sammelexport sind manuell; fertige Transkripte bleiben bis zum
+Schließen der App in der Liste auswählbar. Es gibt weiterhin kein automatisches
+Speichern oder Wiederherstellen von Ergebnissen nach einem App-Neustart. Die App bettet
 frei lizenzierte Schriften in DOCX und PDF ein. PDF verwendet HarfBuzz und
 bidirektionales Layout, TXT ist UTF-8.
 

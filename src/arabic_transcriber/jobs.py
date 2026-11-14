@@ -9,7 +9,8 @@ from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
 
-from .media import download_audio, youtube_title, youtube_url
+from .media import Cancelled, download_audio, youtube_title, youtube_url
+from .playlists import playlist_url, read_playlist, video_key
 from .runlog import event
 from .worker import Signal, serve, stop_process
 
@@ -24,6 +25,7 @@ class Job:
         segment_seconds=12,
         pause_retention_seconds=300,
         title_resolver=youtube_title,
+        playlist_reader=read_playlist,
     ):
         self._condition = threading.Condition(threading.RLock())
         self._context = mp.get_context("spawn")
@@ -31,6 +33,11 @@ class Job:
         self._downloader = downloader
         self._seconds = segment_seconds
         self._title_resolver = title_resolver
+        self._playlist_reader = playlist_reader
+        self._playlist_import = {"status": "idle"}
+        self._playlist_value = None
+        self._playlist_options = {}
+        self._import_cancel = threading.Event()
         self._items = []
         self._work = {}
         self._selected = None
@@ -85,10 +92,12 @@ class Job:
                 }
                 end = item.get("finished") or item.get("paused_at") or now
                 summary["elapsed_seconds"] = int(end - item["started"]) if item["started"] else 0
+                summary["has_transcript"] = bool(item["segments"])
                 summaries.append(summary)
             return deepcopy(
                 {
                     "items": summaries,
+                    "playlist_import": self._playlist_import,
                     "selected_id": self._selected,
                     "active_id": self._active,
                     "model_loaded": self._model_loaded,
@@ -164,6 +173,113 @@ class Job:
                 return {"ok": False, "error": "Auftrag nicht gefunden."}
             self._selected = identifier
             return {"ok": True}
+
+    def export_entries(self):
+        with self._condition:
+            return deepcopy(
+                [
+                    {key: item[key] for key in ("title", "status", "segments")}
+                    for item in self._items
+                    if item["segments"]
+                ]
+            )
+
+    def import_playlist(self, value, options=None):
+        canonical = playlist_url(value)
+        if not canonical:
+            return {"ok": False, "error": "Bitte einen gültigen YouTube-Playlist-Link eingeben."}
+        if (options or {}).get("device", "cpu") not in ("cpu", "mps", "cuda"):
+            return {"ok": False, "error": "Ungültiges Ausführungsgerät."}
+        with self._condition:
+            if self._closed:
+                return {"ok": False, "error": "Die App wird geschlossen."}
+            if self._playlist_import["status"] in ("pending", "loading", "cancelling"):
+                return {"ok": False, "error": "Eine Playlist wird bereits eingelesen."}
+            self._playlist_value = canonical
+            self._playlist_options = dict(options or {})
+            self._import_cancel.clear()
+            self._playlist_import = {
+                "status": "pending",
+                "found": 0,
+                "title": "",
+                "added": 0,
+                "duplicates": 0,
+                "skipped": 0,
+                "error": None,
+            }
+            self._condition.notify_all()
+            return {"ok": True, "importing": True}
+
+    def cancel_playlist_import(self):
+        with self._condition:
+            if self._playlist_import["status"] in ("pending", "loading"):
+                self._import_cancel.set()
+                self._playlist_import["status"] = "cancelling"
+                self._condition.notify_all()
+            return {"ok": True}
+
+    def _read_playlist(self):
+        request = self._playlist_import
+
+        def report(count):
+            with self._condition:
+                request["found"] = count
+
+        try:
+            if self._import_cancel.is_set():
+                raise Cancelled()
+            result = self._playlist_reader(self._playlist_value, self._import_cancel, report)
+            with self._condition:
+                if self._closed or self._import_cancel.is_set():
+                    raise Cancelled()
+                seen = {
+                    video_key(i["value"])
+                    for i in self._items
+                    if i["source"] == "youtube" and i["status"] not in ("error", "cancelled")
+                }
+                added, duplicates, skipped = 0, 0, result.get("skipped", 0)
+                for entry in result["entries"]:
+                    key = video_key(entry.get("url", ""))
+                    if not key:
+                        skipped += 1
+                        continue
+                    if key in seen:
+                        duplicates += 1
+                        continue
+                    response = self.start("youtube", entry["url"], self._playlist_options)
+                    if not response["ok"]:
+                        raise RuntimeError(response["error"])
+                    item = self._find(response["id"])
+                    item.update(
+                        title=entry.get("title") or entry["url"],
+                        metadata_status="ready" if entry.get("title") else "unavailable",
+                        playlist_title=result["title"],
+                    )
+                    seen.add(key)
+                    added += 1
+                self._playlist_import.update(
+                    status="completed",
+                    title=result["title"],
+                    added=added,
+                    duplicates=duplicates,
+                    skipped=skipped,
+                )
+        except Cancelled:
+            with self._condition:
+                self._playlist_import["status"] = "cancelled"
+        except Exception:
+            with self._condition:
+                self._playlist_import.update(
+                    status="error",
+                    error="Playlist konnte nicht eingelesen werden. Verbindung und öffentliche Freigabe prüfen.",
+                )
+        finally:
+            with self._condition:
+                # A new request may already have replaced this completed import.
+                if self._playlist_import is request:
+                    self._playlist_options.clear()
+                    self._playlist_value = None
+                self._condition.notify_all()
 
     def pause(self):
         with self._condition:
@@ -261,6 +377,8 @@ class Job:
     def close(self):
         with self._condition:
             self._closed = True
+            self._import_cancel.set()
+            self._playlist_options.clear()
             self._condition.notify_all()
         self._thread.join(3)
 
@@ -269,12 +387,25 @@ class Job:
             with self._condition:
                 if self._closed:
                     return
-                item = next((i for i in self._items if i["metadata_status"] == "pending"), None)
-                if not item:
+                importing = self._playlist_import["status"] in ("pending", "cancelling")
+                if importing and self._playlist_import["status"] == "pending":
+                    self._playlist_import["status"] = "loading"
+                item = (
+                    None
+                    if importing
+                    else next((i for i in self._items if i["metadata_status"] == "pending"), None)
+                )
+                if importing:
+                    pass
+                elif not item:
                     self._condition.wait(0.2)
                     continue
-                item["metadata_status"] = "loading"
-                identifier, value = item["id"], item["value"]
+                else:
+                    item["metadata_status"] = "loading"
+                    identifier, value = item["id"], item["value"]
+            if importing:
+                self._read_playlist()
+                continue
             try:
                 title = self._title_resolver(value)
             except Exception:
