@@ -121,17 +121,22 @@ def test_desktop_playlist_link_is_imported_into_paused_queue():
 
 def test_desktop_collection_export_uses_native_save_and_all_results(tmp_path):
     import zipfile
+    from datetime import date
 
     class Results:
         def export_entries(self):
             return [
                 {
                     "title": "واحد",
+                    "playlist_title": "دروس",
+                    "playlist_url": "https://www.youtube.com/playlist?list=PLone",
                     "status": "completed",
                     "segments": [{"start": 0, "end": 12, "text": "نص أول"}],
                 },
                 {
                     "title": "اثنان",
+                    "playlist_title": "دروس",
+                    "playlist_url": "https://www.youtube.com/playlist?list=PLone",
                     "status": "completed",
                     "segments": [{"start": 12, "end": 24, "text": "نص ثان"}],
                 },
@@ -139,6 +144,9 @@ def test_desktop_collection_export_uses_native_save_and_all_results(tmp_path):
 
     class Window:
         def create_file_dialog(self, *args, **kwargs):
+            assert (
+                kwargs["save_filename"] == f"دروس - 2 Transkripte - {date.today().isoformat()}.zip"
+            )
             return str(tmp_path / "all.zip")
 
     api = DesktopAPI(job=Results())
@@ -149,4 +157,7 @@ def test_desktop_collection_export_uses_native_save_and_all_results(tmp_path):
         assert [archive.read(name).decode("utf-8") for name in archive.namelist()] == [
             "نص أول",
             "نص ثان",
+            f"دروس - 2 Transkripte - {date.today().isoformat()}\n\n1. واحد\n\nنص أول\n\n2. اثنان\n\nنص ثان",
         ]
+    api.window.create_file_dialog = lambda *args, **kwargs: None
+    assert api.export_all("pdf") == {"path": None}

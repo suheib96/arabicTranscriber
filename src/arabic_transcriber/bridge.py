@@ -143,22 +143,25 @@ class DesktopAPI:
     def export_all(self, fmt, include_times=False):
         import webview
 
-        from .exports import export_collection
+        from .exports import collection_title, export_collection
 
         if fmt not in ("txt", "docx", "pdf"):
             return {"error": "Unbekanntes Exportformat."}
         entries = self.job.export_entries() if self.job else []
         if not entries:
             return {"error": "Noch kein Transkript vorhanden."}
+        title = collection_title(entries)
         chosen = self.window.create_file_dialog(
-            webview.FileDialog.SAVE, save_filename="Transkripte.zip", file_types=("ZIP (*.zip)",)
+            webview.FileDialog.SAVE, save_filename=title + ".zip", file_types=("ZIP (*.zip)",)
         )
         if not chosen:
             return {"path": None}
         destination = chosen[0] if isinstance(chosen, (tuple, list)) else chosen
         try:
             return {
-                "path": str(export_collection(entries, destination, fmt, bool(include_times))),
+                "path": str(
+                    export_collection(entries, destination, fmt, bool(include_times), title=title)
+                ),
                 "count": len(entries),
             }
         except Exception:

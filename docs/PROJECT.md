@@ -36,6 +36,13 @@ restricted to individual videos. Unavailable entries/errors must be visible in
 import counts or per-item failures without creating a second ASR pipeline.
 Offer a manual collected export: one ZIP, individual safely named TXT/DOCX/PDF
 files per available transcript, preserving the existing timestamp option.
+The approved collected export also includes one combined document in the same
+chosen format (PDF by default, TXT/DOCX alternatives). Preserve queue order and
+video-title headings; each subsequent video starts a new page in PDF/DOCX.
+Name the ZIP and combined file with the common playlist title when all included
+results belong to one playlist, otherwise the result count, plus the local date.
+Count only nonempty results, visibly distinguish partial results before export
+and in the documents, and keep the native save destination selectable.
 Automatic permanent transcript storage was asked as an optional preference but
 has not been requested/selected; in-session retention remains the current rule.
 The user requested local Conventional Commits only for this extension.

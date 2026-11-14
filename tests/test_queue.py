@@ -34,6 +34,46 @@ class TextRecognizer:
         return "نص"
 
 
+class LocalDownload:
+    def __init__(self, path):
+        self.path = path
+
+    def __call__(self, url, directory, cancel, report):
+        return Path(self.path)
+
+
+def test_playlist_results_preserve_provenance_for_collected_export(tmp_path):
+    def read(url, cancel, report):
+        return {
+            "title": "دروس",
+            "entries": [
+                {"url": "https://youtu.be/first", "title": "الدرس الأول"},
+                {"url": "https://youtu.be/second", "title": "الدرس الثاني"},
+            ],
+        }
+
+    playlist = "https://www.youtube.com/playlist?list=PL_example"
+    queue = Job(
+        recognizer=TextRecognizer(),
+        downloader=LocalDownload(audio_file(tmp_path)),
+        playlist_reader=read,
+    )
+    try:
+        assert queue.import_playlist(playlist, {"token": "fixture-secret"})["ok"]
+        wait_for(
+            queue,
+            lambda s: len(s["items"]) == 2 and all(i["status"] == "completed" for i in s["items"]),
+        )
+        records = queue.export_entries()
+        assert [r["title"] for r in records] == ["الدرس الأول", "الدرس الثاني"]
+        assert all(r["playlist_title"] == "دروس" and r["playlist_url"] == playlist for r in records)
+        assert "fixture-secret" not in str(records)
+        records[0]["segments"][0]["text"] = "changed"
+        assert queue.export_entries()[0]["segments"][0]["text"] == "نص"
+    finally:
+        queue.close()
+
+
 class AuditDownload:
     def __init__(self, audio, title_ready, audit):
         self.audio, self.title_ready, self.audit = audio, title_ready, audit

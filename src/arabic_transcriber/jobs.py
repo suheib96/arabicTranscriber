@@ -178,7 +178,10 @@ class Job:
         with self._condition:
             return deepcopy(
                 [
-                    {key: item[key] for key in ("title", "status", "segments")}
+                    {
+                        key: item.get(key)
+                        for key in ("title", "status", "segments", "playlist_title", "playlist_url")
+                    }
                     for item in self._items
                     if item["segments"]
                 ]
@@ -254,6 +257,7 @@ class Job:
                         title=entry.get("title") or entry["url"],
                         metadata_status="ready" if entry.get("title") else "unavailable",
                         playlist_title=result["title"],
+                        playlist_url=self._playlist_value,
                     )
                     seen.add(key)
                     added += 1

@@ -84,10 +84,20 @@ are never sent to the metadata reader, snapshots or archive exports. Only
 individual video URLs reach the media worker. Playlist import can be cancelled
 independently of a currently running transcription.
 
-`Job.export_entries` returns a consistent copy of nonempty per-item results.
+`Job.export_entries` returns a consistent copy of nonempty per-item results,
+including playlist URL/title provenance without runtime credentials. Compare
+playlist URLs when selecting a common collection title; equal titles alone do
+not identify one playlist. Collection names include the actual result count and
+local date, with UTF-8-byte-bounded safe filenames for Windows/macOS.
 `exports.export_collection` writes each existing export format sequentially
 into a temporary ZIP and atomically replaces the selected destination only
 when successful. Numbered sanitized basenames preserve Unicode titles without
 path separators or filename collisions. Partial results are explicitly named.
+The same ZIP also includes a combined document in the selected format. TXT
+separates title/body blocks; DOCX/PDF reuse the existing Arabic font/body pipeline
+with per-video headings and page boundaries. A playlist title and count/date
+use separate title lines so mixed RTL/LTR ordering remains readable. The complete
+archive is committed only after this additional document succeeds too. The UI
+defaults to PDF and displays complete/partial counts without altering selection.
 Transcript content is not automatically persisted, and no ZIP is created until
 the user exports. The session store remains memory-only.

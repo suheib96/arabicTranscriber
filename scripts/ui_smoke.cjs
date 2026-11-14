@@ -9,6 +9,7 @@ require('fs').mkdirSync('.scratch/arabic-transcriber', {recursive:true});
  const html=execFileSync(python,['-c','import sys; from arabic_transcriber.app import ui_document; sys.stdout.buffer.write(ui_document().encode("utf-8"))'],{encoding:'utf8',maxBuffer:4*1024*1024});
  await page.setContent(html);
  await page.evaluate(()=>document.fonts.ready);
+ if(await page.locator('#format').inputValue()!=='pdf')throw Error('PDF must be the default export format');
  if(!await page.evaluate(()=>document.fonts.check('21px NotoArabic')))throw Error('Arabic font missing');
  await page.screenshot({path:'.scratch/arabic-transcriber/ui-idle.png'});
  await page.evaluate(()=>window.pywebview={api:{choose_file:async()=>{throw Error('Dialog nicht verfügbar');}}});
@@ -78,13 +79,17 @@ require('fs').mkdirSync('.scratch/arabic-transcriber', {recursive:true});
  // Playlist import and collected export use the real DOM and a network-boundary fake.
  await page.evaluate(()=>{
    window.fixture.items[0].has_transcript=true;
+   window.fixture.items[0].status='completed';
+   window.fixture.items[1].has_transcript=true;
+   window.fixture.items[1].status='cancelled';
    window.pywebview.api.start=async(source,value)=>{window.fixture.playlist_import={status:'loading',found:3};return {ok:true,importing:true};};
    window.pywebview.api.cancel_playlist_import=async()=>{window.fixture.playlist_import.status='cancelled';return {ok:true};};
-   window.pywebview.api.export_all=async(fmt,times)=>{window.collectionArgs=[fmt,times];return {path:'/tmp/collection.zip',count:1};};
+   window.pywebview.api.export_all=async(fmt,times)=>{window.collectionArgs=[fmt,times];return {path:'/tmp/collection.zip',count:2};};
    snapshot=window.fixture;render();
  });
  if(!await page.locator('#exportAll').count())throw Error('collected export control missing');
  if(!await page.locator('#exportAll').isEnabled())throw Error('collected export disabled with transcript');
+ if((await page.locator('#exportSummary').textContent()).trim()!=='1 fertig · 1 Teiltranskript')throw Error('collection result counts missing');
  await page.locator('#format').selectOption('docx');
  await page.locator('#outputTimes').check();
  await page.locator('#exportAll').click();

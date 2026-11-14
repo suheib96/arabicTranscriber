@@ -126,6 +126,10 @@ function render() {
   ['token', 'device', 'offline'].forEach(id => $(id).disabled = busy && !snapshot.paused);
   $('copy').disabled = !segments.length; $('export').disabled = exporting || !segments.length;
   const exportCount = items.filter(item => item.has_transcript).length;
+  const completeCount = items.filter(item => item.has_transcript && item.status === 'completed').length;
+  const partialCount = exportCount - completeCount;
+  $('exportSummary').hidden = !partialCount;
+  $('exportSummary').textContent = `${completeCount} fertig · ${partialCount} ${partialCount === 1 ? 'Teiltranskript' : 'Teiltranskripte'}`;
   $('exportAll').disabled = exporting || !exportCount;
   $('exportAll').textContent = `Alle exportieren${exportCount ? ` · ${exportCount}` : ''}`;
   $('format').disabled = exporting;

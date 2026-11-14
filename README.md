@@ -6,8 +6,8 @@ Datei-/YouTube-Import, wachsendes RTL-Transkript, Fortschritt, Abbrechen,
 Alles kopieren sowie TXT, Word DOCX und PDF.
 
 Lokaler Entwicklungsstand **0.3.0**: YouTube-Playlists in die serielle
-Warteschlange importieren und alle vorhandenen Transkripte gesammelt als ZIP
-exportieren. Ein neues Paket beziehungsweise GitHub-Release ist ein separater
+Warteschlange importieren und alle vorhandenen Transkripte als ZIP mit Einzel-
+und gemeinsamer Datei exportieren. PDF ist vorausgewählt. Ein neues Paket beziehungsweise GitHub-Release ist ein separater
 Schritt; der vorhandene lokale App-Build wird dadurch nicht aktualisiert.
 
 ## Lokal starten
@@ -90,10 +90,20 @@ Für lange Medien ausreichend temporären Plattenplatz einplanen (PCM ca. 115 MB
 Umschalten verändert weder Text noch Modelllauf. DOCX ist das aktuelle
 Word-Format; es werden keine DOCX-Dateien als `.doc` ausgegeben.
 „Alle exportieren“ erstellt ein ZIP mit einer eigenen Datei pro vorhandenem
-Transkript, im gewählten Format und mit der gemeinsamen Zeitangaben-Einstellung.
+Transkript **und einer gemeinsamen Datei mit allen Transkripten** in der
+Reihenfolge der Warteschlange. Format und Zeitangaben-Einstellung gelten für
+alle Dateien im ZIP; PDF ist standardmäßig gewählt, TXT und Word bleiben
+auswählbar. In der gemeinsamen Datei steht vor jedem Transkript der Videotitel;
+PDF und Word beginnen jedes weitere Video auf einer neuen Seite.
 Dateinamen enthalten eine laufende Nummer und den Videotitel; vorhandene
-Teilergebnisse sind als „Teiltranskript“ gekennzeichnet. Leere Ergebnisse werden
-nicht exportiert. Die Dateien werden lokal am gewählten Speicherort angelegt.
+Teilergebnisse sind auch im gemeinsamen Dokument als „Teiltranskript“
+gekennzeichnet. Die Oberfläche zeigt bei Teilergebnissen vor dem Export die
+Anzahl fertiger und unvollständiger Transkripte. Leere Ergebnisse werden nicht
+exportiert. Das ZIP und die gemeinsame Datei heißen bei einer einzigen Playlist
+beispielsweise `Playlist-Titel - 11 Transkripte - 2026-11-14`; bei einer manuell
+befüllten oder gemischten Warteschlange entfällt der Playlist-Titel. Gezählt
+werden tatsächlich enthaltene Transkripte. Lange/ungültige Dateinamen werden
+gekürzt/bereinigt. Der native Speicherdialog wählt den Zielordner, etwa Downloads.
 Einzel- und Sammelexport sind manuell; fertige Transkripte bleiben bis zum
 Schließen der App in der Liste auswählbar. Es gibt weiterhin kein automatisches
 Speichern oder Wiederherstellen von Ergebnissen nach einem App-Neustart. Die App bettet

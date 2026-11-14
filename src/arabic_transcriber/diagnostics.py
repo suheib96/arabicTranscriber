@@ -72,8 +72,8 @@ def self_check(destination):
                     True,
                 )
                 with zipfile.ZipFile(collection) as archive:
-                    assert len(archive.namelist()) == 1
-                    assert archive.namelist()[0].endswith("." + fmt)
+                    assert len(archive.namelist()) == 2
+                    assert all(name.endswith("." + fmt) for name in archive.namelist())
             report["collection_exports"] = True
         report["ok"] = True
     except Exception as error:

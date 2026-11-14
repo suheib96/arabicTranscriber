@@ -1,5 +1,25 @@
 # Update 2026-11-14 — version 0.3.0 (local source only)
 
+Second local change: collected exports now include the individual files **and
+one combined TXT/DOCX/PDF document**. PDF is the UI default. Common playlist
+provenance determines the proposed ZIP/combined filename; mixed/manual queues
+use actual result count and local date. Partial-result counts are visible in
+the UI and partial chapters/files are labelled. Individual export remains.
+Forty pytest tests pass, including an actual 80-result ZIP (81 documents),
+UTF-8 filename limits, queue provenance, per-video DOCX/PDF page boundaries,
+native save naming/cancellation and preservation of an existing export when
+storage fails during combined-file archiving. The shipped browser document
+passed PDF-default, format/timestamp, count, selection and compact-layout checks.
+Mixed Arabic/Latin combined PDFs and DOCX files were rendered and every page
+visually inspected. Word used the bundled LibreOffice runtime via render_docx.py;
+the title template border and ambiguous mixed title/date order were corrected.
+Source runtime self-check passed real collection exports with both documents
+per one-result ZIP. Native source WKWebView smoke also passed bridge, controls,
+RTL/font and viewport checks. Ruff lint/format and diff checks passed.
+This remains source verification with no real inference or
+new frozen package. The preceding playlist commit is ce0dd58; this extension is
+a separate local Conventional Commit, with no push/tag/release.
+
 - Public playlist URLs now import titles and video IDs in order through a
   metadata-only background reader. Duplicate and unavailable entries are
   skipped, cancellation discards late results, and the existing heavy media
